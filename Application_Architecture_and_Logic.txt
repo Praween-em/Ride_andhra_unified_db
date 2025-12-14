@@ -1,0 +1,139 @@
+Settings for RideAndhra Driver App Application Architecture & Logic
+
+1. OVERVIEW
+   This document outlines the complete architecture, endpoints, and application logic for the RideAndhra Driver App.
+   - Frontend: React Native (Expo)
+   - Backend: NestJS
+   - Database: PostgreSQL (inferred)
+   - key Integrations: MSG91 (OTP), Expo Notifications, PhonePe (Payments).
+
+2. AUTHENTICATION & ONBOARDING FLOW
+
+   2.1. Login (LoginScreen.tsx)
+      - User enters 10-digit Phone Number.
+      - Action: 'Send OTP' button pressed.
+      - Logic: 
+        - Validates length (10 digits).
+        - Calls 'OTPWidget.sendOTP' (MSG91).
+        - On success: Navigates to 'OtpVerificationScreen' with 'reqId' and 'phoneNumber'.
+
+   2.2. OTP Verification (OtpVerificationScreen.tsx)
+      - User enters 6-digit OTP.
+      - Action: 'Verify OTP' button pressed.
+      - Logic:
+        - Calls 'OTPWidget.verifyOTP'.
+        - Verifies the received access token via 'verifyMsg91AccessToken'.
+        - Backend Call: POST '/auth/login-by-phone' with verified phone number.
+        - Stores 'token' (JWT) in AsyncStorage.
+      - Routing Logic (Post-Login):
+        - If User Exists AND is Driver AND Status is 'approved' -> Navigate to 'Main' (Home).
+        - If User Exists AND is Driver AND Status is 'pending_approval' -> Navigate to 'VerificationPending'.
+        - If User Exists BUT NOT Driver -> Navigate to 'DriverRegistrationStack'.
+        - If New User -> Navigate to 'DriverRegistrationStack'.
+
+   2.3. Driver Registration (DriverRegistrationStack)
+      - Flow: PersonalInfo -> SelectVehicle -> DrivingLicense -> VehicleInfo -> AadhaarPan.
+      - Logic:
+        - Collects data step-by-step using 'DriverRegistrationContext'.
+        - 'AadhaarPanScreen' (Final Step):
+             - Validates all required fields are present.
+             - Constructs 'FormData' with images (Profile, License Front/Back, Aadhaar, PAN) and text fields.
+             - Backend Call: POST '/profile/register-driver'.
+             - On Success: Navigates to 'VerificationPending'.
+
+3. MAIN APPLICATION LOGIC
+
+   3.1. Home Screen (HomeScreen.tsx)
+      - Initialization:
+        - Checks Location Permissions (Foreground).
+        - Fetches initial 'isOnline' status via GET '/profile'.
+        - Registers for Push Notifications (Expo) and sends token to Backend (PUT '/profile/push-token').
+      - Online/Offline Toggle:
+        - Action: 'GO ONLINE' / 'GO OFFLINE' button.
+        - Logic:
+           - If Going Online: Checks location -> API PUT '/profile/driver/status' with { online: true, location: { lat, long } }.
+           - If Going Offline: API PUT '/profile/driver/status' with { online: false }.
+           - Starts/Stops periodic location update interval (every 20s).
+      - Notifications:
+        - Listens for 'ride_request' push notifications.
+        - Updates 'RideRequestContext' which displays 'RideRequestCard'.
+        - Sliding Drawer shows notification history (GET '/notifications').
+
+   3.2. Rides Management (RidesScreen.tsx)
+      - On Focus: Fetches Driver Status, Pending Rides, and Current Ride.
+      - Active (Current) Ride Logic:
+         - GET '/rides/current'.
+         - Displays ride details, user info, and status (accepted/in_progress).
+         - Status 'accepted': Shows 'START TRIP' button.
+            - Action: Opens PIN Modal.
+            - Logic: Drivers enters 4-digit PIN provided by rider -> API POST '/rides/:id/start'.
+         - Status 'in_progress': Shows 'COMPLETE TRIP' button.
+            - Action: Completes ride -> API POST '/rides/:id/complete'.
+      - Pending Rides Logic:
+         - GET '/rides/pending'.
+         - Lists available rides.
+         - 'Accept' -> API POST '/rides/:id/accept'.
+         - 'Reject' -> API POST '/rides/:id/decline'.
+
+   3.3. Wallet (WalletScreen.tsx)
+      - Initialization: GET '/wallet'.
+      - Displays:
+         - Current Balance.
+         - Referral Balance.
+         - Transaction History (Credit/Debit).
+      - Withdrawal Logic:
+         - Allowed only if Referral Balance >= 1000.
+         - Navigates to 'WithdrawScreen'.
+
+4. BACKEND ENDPOINTS (Server)
+
+   4.1. Auth Module (AuthController)
+      - POST '/auth/verify-widget': Verifies MSG91 OTP token.
+      - POST '/auth/login-by-phone': Logs in or creates user by phone number using 'LoginByPhoneDto'. Returns JWT.
+
+   4.2. Profile Module (ProfileController)
+      - GET '/profile': Get current user/driver profile.
+      - PATCH '/profile': Update profile details.
+      - POST '/profile/register-driver': (Multipart) Registers a new driver with documents.
+      - PUT '/profile/driver/status': Updates online status and location.
+      - PUT '/profile/push-token': Updates Expo push token.
+      - GET '/profile/earnings': Gets driver earnings.
+      - Documents:
+         - POST '/profile/documents/:driverId': Upload single doc.
+         - GET '/profile/documents/:driverId': List docs.
+         - PATCH '/profile/documents/:documentId/verify': Admin verify doc.
+
+   4.3. Rides Module (RidesController)
+      - POST '/rides': Create a new ride (User side usually).
+      - GET '/rides': Get all rides.
+      - GET '/rides/current': Get currently active ride for driver/user.
+      - GET '/rides/pending': Get list of pending rides for driver.
+      - GET '/rides/:id': Get specific ride details.
+      - PATCH '/rides/:id': Update ride.
+      - POST '/rides/:id/accept': Driver accepts ride.
+      - POST '/rides/:id/decline': Driver declines ride.
+      - POST '/rides/:id/start': Start ride (requires PIN).
+      - POST '/rides/:id/complete': Complete ride.
+
+   4.4. Wallet Module (WalletController)
+      - GET '/wallet': Get wallet balance and transactions.
+      - POST '/wallet/add-funds': Add funds to wallet.
+
+   4.5. Notifications Module (NotificationsController)
+      - GET '/notifications': Get user's notification history.
+
+   4.6. PhonePe Module (PhonepeController)
+      - POST '/phonepe-payment': Initiate payment.
+      - POST '/check-payment-status': Check status.
+
+5. DATA & LOGIC NOTES
+   - Security: All endpoints (except Auth/Public) are guarded by 'JwtAuthGuard'.
+   - Real-time:
+      - App uses polling (every 20s for location, auto-refresh on screen focus) and Push Notifications for immediate alerts (Ride Requests).
+   - Storage:
+      - 'AsyncStorage' used for: 'token', 'phoneNumber', 'subscriptionExpiry'.
+   - Error Handling:
+      - Global error logging configured.
+      - Frontend handles API errors with Alerts.
+
+This document serves as the single source of truth for the application's functional logic and API surface.

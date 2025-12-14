@@ -1,0 +1,67 @@
+√ Select platform » Android
+√ Which build profile do you want to configure? » production-apk                  
+✔ Using build profile: production-apk
+Android Credentials     
+Project                 ride-andhra-rider
+Application Identifier  com.rideandhra.rider
+
+Push Notifications (FCM Legacy)  
+  None assigned yet
+
+Push Notifications (FCM V1): Google Service Account Key For FCM V1  
+  None assigned yet
+
+Submissions: Google Service Account Key for Play Store Submissions
+  None assigned yet
+
+Configuration: Build Credentials aL06ncEEZ3 (Default)
+Keystore
+Type                JKS
+Key Alias           77b973f518fa2b88033fd035dd90d237
+MD5 Fingerprint     09:78:DC:F4:92:E9:BE:05:33:37:56:D5:91:1A:56:6D
+SHA1 Fingerprint    B5:C8:6B:15:FD:CA:3D:BD:C4:20:69:83:12:CB:F4:3A:6D:39:0F:21   
+SHA256 Fingerprint  61:EB:B0:2B:E3:F5:38:69:95:6A:ED:FE:BB:27:DD:59:E8:C8:D8:70:68:92:4D:4B:3B:FF:F3:56:27:61:BE:D6
+Updated             22 hours ago
+
+√ What do you want to do? » Keystore: Manage everything needed to build your project                                                                                
+Android Credentials                                                               
+Project                 ride-andhra-rider                                         
+Application Identifier  com.rideandhra.rider                                      
+                                                                                  
+Push Notifications (FCM Legacy)                                                   
+  None assigned yet                                                               
+
+Push Notifications (FCM V1): Google Service Account Key For FCM V1
+  None assigned yet
+
+Submissions: Google Service Account Key for Play Store Submissions
+  None assigned yet
+Submissions: Google Service Account Key for Play Store Submissions
+  None assigned yet
+Submissions: Google Service Account Key for Play Store Submissions
+  None assigned yet
+Submissions: Google Service Account Key for Play Store Submissions
+  None assigned yet
+Type                JKS
+Key Alias           77b973f518fa2b88033fd035dd90d237
+MD5 Fingerprint     09:78:DC:F4:92:E9:BE:05:33:37:56:D5:91:1A:56:6D
+SHA1 Fingerprint    B5:C8:6B:15:FD:CA:3D:BD:C4:20:69:83:12:CB:F4:3A:6D:39:0F:21   
+SHA256 Fingerprint  61:EB:B0:2B:E3:F5:38:69:95:6A:ED:FE:BB:27:DD:59:E8:C8:D8:70:68:92:4D:4B:3B:FF:F3:56:27:61:BE:D6
+Updated             22 hours ago
+
+√ What do you want to do? » Download existing keystore
+√ Do you want to display the sensitive information of the Android Keystore? ... yes
+Saving Keystore to @praweenx356__ride-andhra-rider.jks
+Type                JKS
+Key Alias           77b973f518fa2b88033fd035dd90d237
+MD5 Fingerprint     09:78:DC:F4:92:E9:BE:05:33:37:56:D5:91:1A:56:6D
+SHA1 Fingerprint    B5:C8:6B:15:FD:CA:3D:BD:C4:20:69:83:12:CB:F4:3A:6D:39:0F:21
+SHA256 Fingerprint  61:EB:B0:2B:E3:F5:38:69:95:6A:ED:FE:BB:27:DD:59:E8:C8:D8:70:68:92:4D:4B:3B:FF:F3:56:27:61:BE:D6
+Updated             22 hours ago
+
+Sensitive Keystore information:
+    Keystore password: d0c78be5e5accaf13f7f1fd1b8d76dfa
+    Key alias:         77b973f518fa2b88033fd035dd90d237
+    Key password:      7d4562154499bdeac3d81f4dd0dd41a1
+
+    Path to Keystore:  @praweenx356__ride-andhra-rider.jks
