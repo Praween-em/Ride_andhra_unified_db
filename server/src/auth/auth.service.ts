@@ -124,4 +124,70 @@ export class AuthService {
     return this.findOrCreateUserByPhone(phoneNumber);
   }
 
+  async sendOtp(phoneNumber: string) {
+    const authKey = this.configService.get<string>('MSG91_AUTH_KEY');
+    const templateId = this.configService.get<string>('MSG91_TEMPLATE_ID');
+
+    // Ensure phone number has 91 prefix
+    let mobile = phoneNumber;
+    if (!mobile.startsWith('91')) {
+      mobile = '91' + mobile;
+    }
+
+    const url = `https://control.msg91.com/api/v5/otp?template_id=${templateId}&mobile=${mobile}&authkey=${authKey}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          Param1: "value1", // Optional params for template
+          Param2: "value2"
+        })
+      });
+      const data = await response.json();
+
+      if (data.type === 'success') {
+        return { message: 'OTP sent successfully', reqId: data.request_id };
+      } else {
+        console.error('MSG91 Send OTP Error:', data);
+        throw new Error(data.message || 'Failed to send OTP');
+      }
+    } catch (error) {
+      throw new Error('Failed to send OTP');
+    }
+  }
+
+  async verifyOtp(phoneNumber: string, otp: string) {
+    const authKey = this.configService.get<string>('MSG91_AUTH_KEY');
+
+    // Ensure phone number has 91 prefix
+    let mobile = phoneNumber;
+    if (!mobile.startsWith('91')) {
+      mobile = '91' + mobile;
+    }
+
+    const url = `https://control.msg91.com/api/v5/otp/verify?otp=${otp}&mobile=${mobile}&authkey=${authKey}`;
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST' // GET or POST depending on MSG91 version, v5 verify is usually POST/GET with query params
+      });
+
+      const data = await response.json();
+
+      if (data.type === 'success') {
+        // OTP Verified. Now Login/Register User.
+        const normalizedPhone = this.normalizePhoneNumber(mobile);
+        return this.findOrCreateUserByPhone(normalizedPhone);
+      } else {
+        throw new UnauthorizedException('Invalid OTP');
+      }
+    } catch (error) {
+      throw new UnauthorizedException('Invalid OTP');
+    }
+  }
+
 }
