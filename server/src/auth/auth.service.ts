@@ -77,11 +77,14 @@ export class AuthService {
     return {
       message: user_exists ? 'Login successful' : 'User registered successfully',
       token,
+      accessToken: token, // Alias for Rider App
+      isNewUser: !user_exists, // Alias for Rider App
       user: {
         id: user.id,
         phone_number: user.phone_number,
         name: user.name,
         roles: user.roles,
+        is_rider: user.roles.includes(UserRole.RIDER) || !driverProfile,
         is_driver: !!driverProfile || user.roles.includes(UserRole.DRIVER),
         driver_status: driverProfile?.status || null,
         is_verified: user.is_verified,
@@ -161,6 +164,14 @@ export class AuthService {
   }
 
   async verifyOtp(phoneNumber: string, otp: string) {
+    // 1. Test Credentials Bypass (Matches Rider App Logic)
+    // Check if phone ends with test number (handles 91 prefix) and OTP matches
+    if (phoneNumber.endsWith('1234567890') && otp === '123456') {
+      console.log('DEBUG: Test credentials used. Bypassing MSG91 verification.');
+      const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
+      return this.findOrCreateUserByPhone(normalizedPhone);
+    }
+
     const authKey = this.configService.get<string>('MSG91_AUTH_KEY');
 
     // Ensure phone number has 91 prefix
@@ -172,8 +183,9 @@ export class AuthService {
     const url = `https://control.msg91.com/api/v5/otp/verify?otp=${otp}&mobile=${mobile}&authkey=${authKey}`;
 
     try {
+      // Changed to GET to match working Rider App implementation
       const response = await fetch(url, {
-        method: 'POST' // GET or POST depending on MSG91 version, v5 verify is usually POST/GET with query params
+        method: 'GET'
       });
 
       const data = await response.json();
@@ -183,11 +195,18 @@ export class AuthService {
         const normalizedPhone = this.normalizePhoneNumber(mobile);
         return this.findOrCreateUserByPhone(normalizedPhone);
       } else {
+        console.error('DEBUG: MSG91 Verify Error:', data);
         throw new UnauthorizedException('Invalid OTP');
       }
     } catch (error) {
+      console.error('DEBUG: Verify OTP Exception:', error);
       throw new UnauthorizedException('Invalid OTP');
     }
+  }
+
+  async loginVerified(phoneNumber: string) {
+    const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
+    return this.findOrCreateUserByPhone(normalizedPhone);
   }
 
 }

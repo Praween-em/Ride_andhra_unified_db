@@ -36,12 +36,12 @@ const RideRequestCard = () => {
 
       return () => clearInterval(interval);
     } else {
-        // Animate card slide-out
-        Animated.timing(slideAnim, {
-            toValue: 300,
-            duration: 300,
-            useNativeDriver: true,
-        }).start();
+      // Animate card slide-out
+      Animated.timing(slideAnim, {
+        toValue: 300,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     }
   }, [rideRequest]);
 
@@ -67,7 +67,7 @@ const RideRequestCard = () => {
       }
       console.error("Failed to accept ride:", error);
     } finally {
-        setRideRequest(null);
+      setRideRequest(null);
     }
   };
 
@@ -78,7 +78,10 @@ const RideRequestCard = () => {
   return (
     <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }] }]}>
       <View style={styles.header}>
-        <Text style={styles.fare}>₹{rideRequest.fare.toFixed(2)}</Text>
+        <View>
+          <Text style={styles.fareLabel}>Estimated Ride Value</Text>
+          <Text style={styles.fare}>₹{rideRequest.fare.toFixed(2)}</Text>
+        </View>
         <View style={styles.timerContainer}>
           <Progress.Circle
             size={40}
@@ -92,13 +95,18 @@ const RideRequestCard = () => {
           />
         </View>
       </View>
+
+      <View style={styles.disclaimerBox}>
+        <Text style={styles.disclaimerText}>💡 Collect payment directly from rider after trip completion</Text>
+      </View>
+
       <View style={styles.locationContainer}>
         <MapPinIcon size={20} color="#34D399" />
-        <Text style={styles.addressText} numberOfLines={1}>{rideRequest.pickupAddress}</Text>
+        <Text style={styles.addressText} numberOfLines={1}>{rideRequest.pickupLocation}</Text>
       </View>
       <View style={[styles.locationContainer, { marginBottom: 20 }]}>
         <MapPinIcon size={20} color="#F87171" />
-        <Text style={styles.addressText} numberOfLines={1}>{rideRequest.dropoffAddress || 'Destination not provided'}</Text>
+        <Text style={styles.addressText} numberOfLines={1}>{rideRequest.dropoffLocation || 'Destination not provided'}</Text>
       </View>
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={[styles.button, styles.declineButton]} onPress={() => handleDecline(true)}>
@@ -135,6 +143,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
   },
+  fareLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    fontWeight: '600',
+    marginBottom: 2,
+  },
   fare: {
     fontSize: 32,
     fontWeight: 'bold',
@@ -148,6 +162,20 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: '#1F2937',
+  },
+  disclaimerBox: {
+    backgroundColor: '#FFFBEB', // Light yellow
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 15,
+  },
+  disclaimerText: {
+    fontSize: 12,
+    color: '#92400E', // Dark yellow/brown
+    fontWeight: '500',
+    textAlign: 'center',
   },
   locationContainer: {
     flexDirection: 'row',

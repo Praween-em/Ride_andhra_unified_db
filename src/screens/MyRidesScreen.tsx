@@ -27,38 +27,61 @@ interface Ride {
   pickupLocation: string;
   dropoffLocation: string;
   status: string;
+  distance?: number;
+  duration?: number;
+  actualDistance?: number;
+  actualDuration?: number;
 }
 
-const RideItem = ({ item }: { item: Ride }) => (
-  <View style={styles.rideCard}>
-    <View style={styles.rideHeader}>
-      <Text style={styles.rideDate}>{formatDate(item.createdAt)}</Text>
-      <Text style={styles.rideFare}>₹{item.finalFare || item.fare || 0}</Text>
-    </View>
+const RideItem = ({ item }: { item: Ride }) => {
+  const displayDistance = item.actualDistance || item.distance;
+  const displayDuration = item.actualDuration || item.duration;
 
-    <View style={styles.rideInfo}>
-      <View style={styles.path}>
-        <View style={[styles.pathDot, { backgroundColor: '#fe7009' }]} />
-        <View style={styles.pathLine} />
-        <View style={[styles.pathDot, { backgroundColor: '#1a202c' }]} />
+  return (
+    <View style={styles.rideCard}>
+      <View style={styles.rideHeader}>
+        <Text style={styles.rideDate}>{formatDate(item.createdAt)}</Text>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={styles.fareLabel}>Estimated Fare</Text>
+          <Text style={styles.rideFare}>₹{item.finalFare || item.fare || 0}</Text>
+        </View>
       </View>
-      <View style={styles.locations}>
-        <Text style={styles.locationText} numberOfLines={1}>{item.pickupLocation}</Text>
-        <Text style={styles.locationText} numberOfLines={1}>{item.dropoffLocation}</Text>
-      </View>
-    </View>
 
-    <View style={styles.rideFooter}>
-      <Text style={styles.rideTime}>{formatTime(item.createdAt)}</Text>
-      <Text style={[styles.rideStatus, {
-        color: item.status === 'completed' ? '#28a745' :
-          item.status === 'cancelled' ? '#dc3545' : '#4a5568'
-      }]}>
-        {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-      </Text>
+      <View style={styles.rideInfo}>
+        <View style={styles.path}>
+          <View style={[styles.pathDot, { backgroundColor: '#fe7009' }]} />
+          <View style={styles.pathLine} />
+          <View style={[styles.pathDot, { backgroundColor: '#1a202c' }]} />
+        </View>
+        <View style={styles.locations}>
+          <Text style={styles.locationText} numberOfLines={1}>{item.pickupLocation}</Text>
+          <Text style={styles.locationText} numberOfLines={1}>{item.dropoffLocation}</Text>
+        </View>
+      </View>
+
+      <View style={styles.statsRow}>
+        <View style={styles.statItem}>
+          <Ionicons name="speedometer-outline" size={16} color="#718096" />
+          <Text style={styles.statText}>{displayDistance ? `${displayDistance} km` : '--'}</Text>
+        </View>
+        <View style={styles.statItem}>
+          <Ionicons name="time-outline" size={16} color="#718096" />
+          <Text style={styles.statText}>{displayDuration ? `${displayDuration} min` : '--'}</Text>
+        </View>
+      </View>
+
+      <View style={styles.rideFooter}>
+        <Text style={styles.rideTime}>{formatTime(item.createdAt)}</Text>
+        <Text style={[styles.rideStatus, {
+          color: item.status === 'completed' ? '#28a745' :
+            item.status === 'cancelled' ? '#dc3545' : '#4a5568'
+        }]}>
+          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+        </Text>
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 const MyRidesScreen = () => {
   const navigation = useNavigation();
@@ -114,17 +137,24 @@ const MyRidesScreen = () => {
           <ActivityIndicator size="large" color="#fe7009" />
         </View>
       ) : (
-        <FlatList
-          data={activeTab === 'completed' ? completedRides : cancelledRides}
-          renderItem={({ item }) => <RideItem item={item} />}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            <View style={styles.centerContainer}>
-              <Text style={styles.emptyText}>No {activeTab} rides found.</Text>
-            </View>
-          }
-        />
+        <>
+          <FlatList
+            data={activeTab === 'completed' ? completedRides : cancelledRides}
+            renderItem={({ item }) => <RideItem item={item} />}
+            keyExtractor={item => item.id}
+            contentContainerStyle={styles.listContainer}
+            ListEmptyComponent={
+              <View style={styles.centerContainer}>
+                <Text style={styles.emptyText}>No {activeTab} rides found.</Text>
+              </View>
+            }
+          />
+          <View style={styles.disclaimerFooter}>
+            <Text style={styles.disclaimerFooterText}>
+              💡 Ride payments are settled directly between driver and rider. The app does not track or store payment data.
+            </Text>
+          </View>
+        </>
       )}
     </SafeAreaView>
   );
@@ -268,6 +298,45 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#718096',
+  },
+  fareLabel: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#a0aec0',
+    marginBottom: 2,
+  },
+  disclaimerFooter: {
+    backgroundColor: '#FFF9E6',
+    padding: 15,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    borderRadius: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#fe7009',
+  },
+  disclaimerFooterText: {
+    fontSize: 12,
+    color: '#4a5568',
+    textAlign: 'center',
+    fontWeight: '500',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    marginTop: 5,
+    paddingHorizontal: 5,
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  statText: {
+    marginLeft: 6,
+    color: '#718096',
+    fontSize: 13,
+    fontWeight: '500',
   },
 });
 

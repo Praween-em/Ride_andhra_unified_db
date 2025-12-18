@@ -74,7 +74,6 @@ const ProfileScreen = () => {
   };
 
   const menuItems = [
-    { icon: ({ color, size }: { color: string, size: number }) => <Ionicons name="gift-outline" size={size} color={color} />, text: 'Refer & Earn', onPress: () => navigation.navigate('Referral') },
     { icon: PhoneIcon, text: 'Contact Us', onPress: () => navigation.navigate('ContactUs') },
     { icon: HelpCircleIcon, text: 'Help', onPress: () => navigation.navigate('Help') },
     { icon: LockIcon, text: 'Privacy Policy', onPress: () => navigation.navigate('PrivacyPolicy') },

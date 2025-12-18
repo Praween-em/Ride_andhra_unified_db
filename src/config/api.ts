@@ -11,18 +11,21 @@ const getApiUrl = () => {
   }
 
   // Check environment variable
-  const envApiUrl = process.env.EXPO_PUBLIC_API_URL;
+  const envApiUrl = process.env.local_url;
   if (envApiUrl) {
     return envApiUrl;
   }
 
-  // Default to local development
+  //Default to local development
   if (__DEV__) {
-    return 'http://192.168.29.18:3000'; // Development - change to your local IP
+    return 'http://192.168.29.18:8082'; // Development - change to your local IP
   }
 
-  // Production fallback
-  return 'https://your-production-api.com'; // CHANGE THIS for production
+  // FORCING LOCAL DEVELOPMENT URL
+  return 'http://192.168.29.18:8082';
+
+  //Production fallback
+  return 'https://ride-andhra-baceknd-final.onrender.com'; // CHANGE THIS for production
 };
 
 const API_BASE_URL = getApiUrl();

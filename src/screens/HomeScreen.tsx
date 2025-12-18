@@ -128,6 +128,11 @@ const HomeScreen = ({ navigation }: { navigation: any }) => {
         const response = await api.get('/profile');
         if (response.data?.profile) {
           setIsOnline(response.data.profile.isOnline);
+          if (response.data.profile.subscriptionExpiry) {
+            await AsyncStorage.setItem('subscriptionExpiry', response.data.profile.subscriptionExpiry);
+          } else {
+            await AsyncStorage.removeItem('subscriptionExpiry');
+          }
         }
       } catch (error) {
         console.error('Error fetching driver status:', error);
@@ -230,7 +235,11 @@ const HomeScreen = ({ navigation }: { navigation: any }) => {
             const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
             const seconds = Math.floor((diff % (1000 * 60)) / 1000);
             setTimeLeft(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+          } else {
+            setTimeLeft('00:00:00');
           }
+        } else {
+          setTimeLeft('00:00:00');
         }
       } catch (e) {
         console.error('Failed to load subscription.', e);
@@ -418,20 +427,14 @@ const HomeScreen = ({ navigation }: { navigation: any }) => {
         ) : null}
         <Card style={[styles.rideStatusCard, styles.highlightCard]}>
           <Card.Content>
-            <Text style={styles.timer}>{timeLeft}</Text>
+            <Text style={[styles.timer, timeLeft === '00:00:00' && { color: 'red' }]}>{timeLeft}</Text>
             <Text style={styles.statusText}>
-              {timeLeft === 'Expired' ? 'Subscription Expired' : timeLeft === 'No Subscription' ? 'No Active Subscription' : 'Subscription Remaining'}
+              {timeLeft === '00:00:00' ? 'No Active Subscription' : 'Subscription Remaining'}
             </Text>
           </Card.Content>
         </Card>
 
         <View style={styles.statsSection}>
-          <Card style={styles.statCard}>
-            <Card.Content>
-              <Text style={styles.statValue}><Image source={require('../assets/rupee.png')} style={{ width: 18, height: 18, tintColor: '#1E293B' }} />1,500</Text>
-              <Text style={styles.statLabel}>Today’s Earnings</Text>
-            </Card.Content>
-          </Card>
           <Card style={styles.statCard}>
             <Card.Content>
               <Text style={styles.statValue}>18</Text>
@@ -465,11 +468,7 @@ const HomeScreen = ({ navigation }: { navigation: any }) => {
         <View style={styles.quickActionsGrid}>
           <TouchableOpacity style={styles.quickActionButton} onPress={() => navigation.navigate('MyRides')}>
             <Image source={require('../assets/bike.png')} style={{ width: 24, height: 24, tintColor: '#fe7009' }} />
-            <Text style={styles.quickActionLabel}>My Rides</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickActionButton} onPress={() => navigation.navigate('Wallet')}>
-            <Image source={require('../assets/wallet-filled-money-tool.png')} style={{ width: 24, height: 24, tintColor: '#fe7009' }} />
-            <Text style={styles.quickActionLabel}>Wallet</Text>
+            <Text style={styles.quickActionLabel}>Ride History</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.quickActionButton} onPress={() => navigation.navigate('Support')}>
             <Image source={require('../assets/customer-service.png')} style={{ width: 24, height: 24, tintColor: '#fe7009' }} />
@@ -511,7 +510,7 @@ const HomeScreen = ({ navigation }: { navigation: any }) => {
                       <Text style={styles.notificationTime}>Now</Text>
                     </View>
                     <Text style={styles.notificationText}>
-                      Enjoy ZERO commissions on your rides! We are excited to have you on board. Drive more, earn more!
+                      You receive full ride payment directly from riders. The platform charges only a fixed subscription fee - no per-ride commission!
                     </Text>
                   </Card.Content>
                 </Card>

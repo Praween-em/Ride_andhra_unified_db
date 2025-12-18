@@ -1,87 +1,206 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Card, Title, Paragraph, Button } from 'react-native-paper';
+import { Card, Title, Button } from 'react-native-paper';
 import { LinearGradient } from 'expo-linear-gradient';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import SubscriptionImage from '../assets/Subscription.png';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import api from '../config/api';
+
+const { width } = Dimensions.get('window');
 
 const SubscriptionsScreen = () => {
-  const navigation = useNavigation();
-  const handleSubscription = (plan) => {
+  const navigation = useNavigation<any>();
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPlans();
+  }, []);
+
+  const fetchPlans = async () => {
+    try {
+      const response = await api.get('/subscriptions/plans');
+      setPlans(response.data);
+    } catch (error) {
+      console.error('Error fetching plans:', error);
+      Alert.alert('Error', 'Failed to load subscription plans');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubscription = (plan: any) => {
+    if (!plan || !plan.id) {
+      Alert.alert('Error', 'Invalid plan selected');
+      return;
+    }
     navigation.navigate('Payment', { plan });
   };
+
+  const dailyPlan = plans.find(p => p.name.toLowerCase().includes('daily') || p.name.toLowerCase().includes('day'));
+  const weeklyPlan = plans.find(p => p.name.toLowerCase().includes('weekly') || p.name.toLowerCase().includes('week'));
+  const monthlyPlan = plans.find(p => p.name.toLowerCase().includes('monthly') || p.name.toLowerCase().includes('month'));
+
+  const PlanFeature = ({ text, isLight = false }: { text: string, isLight?: boolean }) => (
+    <View style={styles.featureRow}>
+      <View style={[styles.checkCircle, isLight ? styles.checkCircleLight : styles.checkCircleDark]}>
+        <Ionicons name="checkmark" size={12} color={isLight ? '#fe7009' : '#fff'} />
+      </View>
+      <Text style={[styles.featureText, isLight ? styles.textLight : styles.textDark]}>{text}</Text>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={[styles.safeArea, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#fe7009" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#1a202c" />
+          <View style={styles.backButtonCircle}>
+            <Ionicons name="arrow-back" size={24} color="#1a202c" />
+          </View>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Subscriptions</Text>
+        <Text style={styles.headerTitle}>Choose Your Plan</Text>
       </View>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          <Card style={styles.card}>
-            <Card.Content>
-              <Title style={styles.cardTitle}>Daily</Title>
-              <Paragraph style={styles.cardPrice}>₹24</Paragraph>
-              <View style={styles.detailsContainer}>
-                <Text style={styles.detailText}>✓ 0% Commission</Text>
-                <Text style={styles.detailText}>✓ Direct Payouts</Text>
-                <Text style={styles.detailText}>✓ Unlimited Rides</Text>
+
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.headerBanner}>
+          <Text style={styles.bannerTitle}>Zero Commission.</Text>
+          <Text style={styles.bannerSubtitle}>Keep 100% of your earnings.</Text>
+        </View>
+
+        {/* Daily Plan */}
+        <Card style={styles.planCard}>
+          <View style={styles.cardInner}>
+            <View style={styles.planHeader}>
+              <View>
+                <Text style={styles.planName}>Daily Pass</Text>
+                <Text style={styles.planDuration}>Valid for 24 hours</Text>
               </View>
-              <Text style={{color:'#fe7009'}}>Save upto ₹250 in daily commissions </Text>
-            </Card.Content>
-            <Card.Actions>
-              <Button mode="contained" onPress={() => handleSubscription({ name: 'Daily', price: 24, validity: '1 Day' })} style={styles.buyButton}>Buy</Button>
-            </Card.Actions>
-          </Card>
-          <Card style={[styles.card, styles.recommendedCard]}>
+              <View style={styles.priceTag}>
+                <Text style={styles.currencySymbol}>₹</Text>
+                <Text style={styles.priceAmount}>24</Text>
+              </View>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.featuresList}>
+              <PlanFeature text="Unlimited ride leads" />
+              <PlanFeature text="No commission fees" />
+              <PlanFeature text="Direct payments" />
+            </View>
+
+            <Text style={styles.gstText}>*GST applicable</Text>
+
+            <TouchableOpacity
+              style={styles.outlineButton}
+              onPress={() => {
+                const plan = dailyPlan || { id: 'daily_plan_placeholder', name: 'Daily Pass', price: 24, durationDays: 1 };
+                handleSubscription(plan);
+              }}
+            >
+              <Text style={styles.outlineButtonText}>Select Daily Pass</Text>
+            </TouchableOpacity>
+          </View>
+        </Card>
+
+        {/* Weekly Plan - Highlighted */}
+        {weeklyPlan && (
+          <Card style={[styles.planCard, styles.popularCard]}>
             <LinearGradient
-              colors={['#fe7009', '#ff9a00']}
-              style={styles.gradientBackground}
+              colors={['#fe7009', '#FF8C42']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
+              style={styles.gradientBackground}
             >
-              <View style={styles.recommendedBadge}>
-                <Text style={styles.recommendedBadgeText}>RECOMMENDED</Text>
+              <View style={styles.popularBadge}>
+                <Text style={styles.popularBadgeText}>MOST POPULAR</Text>
               </View>
-              <Card.Content>
-                <Title style={[styles.cardTitle, styles.recommendedCardTitle]}>Weekly</Title>
-                <Paragraph style={[styles.cardPrice, styles.recommendedCardPrice]}>₹149</Paragraph>
-                <View style={styles.detailsContainer}>
-                  <Text style={[styles.detailText, styles.recommendedDetailText]}>✓ 0% Commission</Text>
-                  <Text style={[styles.detailText, styles.recommendedDetailText]}>✓ Direct Payouts</Text>
-                  <Text style={[styles.detailText, styles.recommendedDetailText]}>✓ Unlimited Rides</Text>
-                  <Text style={[styles.detailText, styles.recommendedDetailText]}>✓ Priority Support</Text>
+
+              <View style={styles.planHeader}>
+                <View>
+                  <Text style={[styles.planName, styles.textLight]}>{weeklyPlan.name}</Text>
+                  <Text style={[styles.planDuration, styles.textLightOpacity]}>Valid for {weeklyPlan.duration_days} days</Text>
                 </View>
-                
-              <Text style={{color:'white'}}>Save upto ₹1500 in Weekly commissions </Text>
-              </Card.Content>
-              <Card.Actions>
-                <Button mode="contained" onPress={() => handleSubscription({ name: 'Weekly', price: 149, validity: '7 Days' })} style={styles.recommendedBuyButton} labelStyle={styles.recommendedBuyButtonText}>Buy</Button>
-              </Card.Actions>
+                <View style={styles.priceTag}>
+                  <Text style={[styles.currencySymbol, styles.textLight]}>₹</Text>
+                  <Text style={[styles.priceAmount, styles.textLight]}>{parseFloat(weeklyPlan.price).toFixed(0)}</Text>
+                </View>
+              </View>
+
+              <View style={[styles.divider, { backgroundColor: 'rgba(255,255,255,0.2)' }]} />
+
+              <View style={styles.featuresList}>
+                <PlanFeature text="Unlimited ride leads" isLight />
+                <PlanFeature text="No commission fees" isLight />
+                <PlanFeature text="Direct payments" isLight />
+                <PlanFeature text="Priority support" isLight />
+              </View>
+
+              <Text style={[styles.gstText, styles.textLightOpacity]}>*GST applicable</Text>
+
+              <TouchableOpacity
+                style={styles.whiteButton}
+                onPress={() => handleSubscription(weeklyPlan)}
+              >
+                <Text style={styles.whiteButtonText}>Choose {weeklyPlan.name}</Text>
+              </TouchableOpacity>
             </LinearGradient>
           </Card>
-          <Card style={styles.card}>
-            <Card.Content>
-              <Title style={styles.cardTitle}>Monthly</Title>
-              <Paragraph style={styles.cardPrice}>₹669</Paragraph>
-              <View style={styles.detailsContainer}>
-                <Text style={styles.detailText}>✓ 0% Commission</Text>
-                <Text style={styles.detailText}>✓ Direct Payouts</Text>
-                <Text style={styles.detailText}>✓ Unlimited Rides</Text>
-                <Text style={styles.detailText}>✓ Dedicated Account Manager</Text>
+        )}
+
+        {/* Monthly Plan */}
+        {monthlyPlan && (
+          <Card style={styles.planCard}>
+            <View style={styles.bestValueBadge}>
+              <Text style={styles.bestValueText}>BEST VALUE</Text>
+            </View>
+            <View style={styles.cardInner}>
+              <View style={styles.planHeader}>
+                <View>
+                  <Text style={styles.planName}>{monthlyPlan.name}</Text>
+                  <Text style={styles.planDuration}>Valid for {monthlyPlan.duration_days} days</Text>
+                </View>
+                <View style={styles.priceTag}>
+                  <Text style={styles.currencySymbol}>₹</Text>
+                  <Text style={styles.priceAmount}>{parseFloat(monthlyPlan.price).toFixed(0)}</Text>
+                </View>
               </View>
-              <Text style={{color:'#fe7009'}}>Save upto ₹7000 in Monthly commissions </Text>
-            </Card.Content>
-            <Card.Actions>
-              <Button mode="contained" onPress={() => handleSubscription({ name: 'Monthly', price: 669, validity: '30 Days' })} style={styles.buyButton}>Buy</Button>
-            </Card.Actions>
+
+              <View style={styles.divider} />
+
+              <View style={styles.featuresList}>
+                <PlanFeature text="Unlimited ride leads" />
+                <PlanFeature text="No commission fees" />
+                <PlanFeature text="Dedicated manager" />
+                <PlanFeature text="Maximum savings" />
+              </View>
+
+              <Text style={styles.gstText}>*GST applicable</Text>
+
+              <TouchableOpacity
+                style={styles.outlineButton}
+                onPress={() => handleSubscription(monthlyPlan)}
+              >
+                <Text style={styles.outlineButtonText}>Select {monthlyPlan.name}</Text>
+              </TouchableOpacity>
+            </View>
           </Card>
-        </View>
+        )}
+
+        <View style={styles.footerSpacing} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -90,102 +209,214 @@ const SubscriptionsScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f4f5f7',
+    backgroundColor: '#F7FAFC',
   },
   header: {
-    backgroundColor: '#ffffff',
-    paddingVertical: 20,
     paddingHorizontal: 20,
+    paddingVertical: 15,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EDF2F7',
   },
   backButton: {
-    position: 'absolute',
-    left: 20,
-    zIndex: 1,
+    marginRight: 15,
+  },
+  backButtonCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F7FAFC',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#1a202c',
-    textAlign: 'center',
-    flex: 1,
+    fontWeight: '700',
+    color: '#1A202C',
   },
   scrollView: {
     flex: 1,
   },
-  content: {
+  contentContainer: {
     padding: 20,
   },
-  card: {
-    marginBottom: 20,
-    elevation: 4,
-    borderRadius: 12,
+  headerBanner: {
+    marginBottom: 25,
+    marginTop: 10,
   },
-  cardTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 5,
-  },
-  cardPrice: {
+  bannerTitle: {
     fontSize: 28,
-    textAlign: 'center',
-    marginBottom: 10,
-    color: '#fe7009',
-    fontWeight: 'bold',
+    fontWeight: '800',
+    color: '#1A202C',
+    lineHeight: 34,
   },
-  detailsContainer: {
-    alignItems: 'flex-start',
-    marginBottom: 10,
-  },
-  detailText: {
+  bannerSubtitle: {
     fontSize: 16,
-    marginBottom: 5,
-    color: '#1E293B',
+    color: '#718096',
+    marginTop: 5,
   },
-  buyButton: {
-    backgroundColor: '#fe7009',
-    marginHorizontal: 10,
-    borderRadius: 8,
+  planCard: {
+    marginBottom: 20,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    overflow: 'hidden', // Important for overflow badges
   },
-  recommendedCard: {
-    borderColor: '#fe7009',
-    borderWidth: 2,
+  popularCard: {
+    transform: [{ scale: 1.02 }], // Slight pop
+    elevation: 8,
   },
   gradientBackground: {
-    padding: 20,
-    borderRadius: 10,
-  },
-  recommendedBadge: {
-    backgroundColor: '#fff',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    padding: 24,
     borderRadius: 20,
-    alignSelf: 'center',
-    marginBottom: 10,
   },
-  recommendedBadgeText: {
-    color: '#fe7009',
-    fontWeight: 'bold',
-    fontSize: 12,
+  cardInner: {
+    padding: 24,
   },
-  recommendedCardTitle: {
-    color: '#fff',
+  planHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
   },
-  recommendedCardPrice: {
-    color: '#fff',
+  planName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1A202C',
+    marginBottom: 4,
   },
-  recommendedDetailText: {
-    color: '#fff',
+  planDuration: {
+    fontSize: 14,
+    color: '#718096',
+    fontWeight: '500',
   },
-  recommendedBuyButton: {
+  priceTag: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  currencySymbol: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A202C',
+    marginTop: 6,
+    marginRight: 2,
+  },
+  priceAmount: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#1A202C',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#EDF2F7',
+    marginBottom: 20,
+  },
+  featuresList: {
+    marginBottom: 20,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  checkCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  checkCircleDark: {
+    backgroundColor: '#fe7009',
+  },
+  checkCircleLight: {
     backgroundColor: '#fff',
-    marginHorizontal: 10,
-    borderRadius: 8,
   },
-  recommendedBuyButtonText: {
+  featureText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  textDark: {
+    color: '#4A5568',
+  },
+  textLight: {
+    color: '#fff',
+  },
+  textLightOpacity: {
+    color: 'rgba(255,255,255,0.8)',
+  },
+  outlineButton: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#fe7009',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  outlineButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
     color: '#fe7009',
+  },
+  whiteButton: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  whiteButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fe7009',
+  },
+  popularBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderBottomLeftRadius: 12,
+  },
+  popularBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#fe7009',
+    letterSpacing: 0.5,
+  },
+  bestValueBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    backgroundColor: '#48BB78', // Green
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderBottomLeftRadius: 12,
+    zIndex: 1,
+  },
+  bestValueText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#fff',
+    letterSpacing: 0.5,
+  },
+  gstText: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginBottom: 15,
+    color: '#A0AEC0',
+    fontStyle: 'italic',
+  },
+  footerSpacing: {
+    height: 40,
   },
 });
 

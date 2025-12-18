@@ -8,6 +8,12 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.useGlobalPipes(new ValidationPipe());
   app.useStaticAssets(join(__dirname, '..', 'uploads'));
-  await app.listen(3000, '0.0.0.0');
+  app.enableCors();
+
+  // Port configuration
+  const port = process.env.PORT || 8082;
+
+  await app.listen(port, '0.0.0.0');
+  console.log(`Application is running on port: ${port}`);
 }
 bootstrap();

@@ -1,0 +1,40 @@
+# BACKEND UNIFICATION & COMPATIBILITY GUIDE
+
+This backend (located in the `server` folder) is a unified NestJS application designed to serve both the **RideAndhra Driver App** and the **RideAndhra Rider App**.
+
+## Core Infrastructure
+- **Port:** The server runs on port **8082** (Primary) and 8083 (Secondary).
+- **Database:** Local PostgreSQL (`ride_andhra`). 
+- **Authentication:** Uses JWT with `PassportModule`.
+
+## Compatibility Strategy (AI Instructions)
+The Rider App was originally built for a separate backend. To make this unified `server` folder work with the Rider App without changing the Rider App's frontend code, follow this **"Aliasing" Strategy**:
+
+### 1. Authentication Aliases
+- **Rider Endpoint:** `/auth/login-verified`
+- **Driver Endpoint:** `/auth/login-by-phone`
+- **Solution:** Both routes are implemented in `AuthController` and call `AuthService.findOrCreateUserByPhone()`.
+- **Response Format:** Ensure the login response carries aliases for both apps:
+    - `token` (Driver) AND `accessToken` (Rider)
+    - `user_exists` (Driver) AND `isNewUser` (Rider)
+
+### 2. Future Method Bridging (CRITICAL)
+If the Rider App fails on other screens (Profile, Rides, etc.), it is likely because it expects a specific URL format or response structure. Instead of changing the Rider App, **add a bridge in the Server**:
+
+- **Example:** If Rider calls `GET /profile/me` but the server only has `GET /profile`:
+    1. Go to `profile.controller.ts`.
+    2. Add `@Get('me')` that simply returns `this.getProfile(req)`.
+    
+- **Example:** If Rider expects `phoneNumber` in a POST body but Server expects `mobile`:
+    1. Create a specific DTO for that Rider endpoint.
+    2. Map the fields in the Controller before passing them to the Service.
+
+## Implementation Tasks for AI
+When the user asks to "make the Rider app work with this server":
+- [ ] **Scan Rider App Logs:** Identify which endpoint is returning 404 (Not Found) or 400 (Bad Request).
+- [ ] **Identify reference:** Look at `rider_reference_backend` to see how that specific endpoint was implemented.
+- [ ] **Implement Alias:** Add that endpoint to the corresponding Controller in the `server/src` directory.
+- [ ] **Normalize Data:** Ensure the JSON response sent back matches exactly what the Rider App components (like `HomeScreen.tsx` or `RidesScreen.tsx`) are trying to destructure.
+
+## Warning
+**NEVER** delete existing Driver App endpoints while adding Rider compatibility. The `server` folder must satisfy both `App.tsx` (Driver) and the Rider App's frontend simultaneously.

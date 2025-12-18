@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  UpdateDateColumn,
   OneToOne,
 } from 'typeorm';
 import { Driver } from '../../profile/entities/driver.entity';
@@ -44,6 +45,12 @@ export class User {
   @Column({ type: 'varchar', length: 4, nullable: true, name: 'rider_pin' })
   ridePin: string;
 
+  @Column({ type: 'varchar', nullable: true, name: 'profile_image' })
+  profile_image: string;
+
   @CreateDateColumn()
   created_at: Date;
+
+  @UpdateDateColumn()
+  updated_at: Date;
 }

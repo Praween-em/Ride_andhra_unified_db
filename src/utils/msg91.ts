@@ -9,7 +9,7 @@ interface VerifyAccessTokenResponse {
 
 export const verifyMsg91AccessToken = async (accessToken: string): Promise<VerifyAccessTokenResponse> => {
   const url = new URL('https://control.msg91.com/api/v5/widget/verifyAccessToken');
-  
+
   const headers = {
     "Content-Type": "application/json",
     "Accept": "application/json",
@@ -26,10 +26,10 @@ export const verifyMsg91AccessToken = async (accessToken: string): Promise<Verif
       headers: headers,
       body: JSON.stringify(body)
     });
-    
+
     if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`MSG91 API responded with status ${response.status}: ${errorText}`);
+      const errorText = await response.text();
+      throw new Error(`MSG91 API responded with status ${response.status}: ${errorText}`);
     }
 
     const json = await response.json();

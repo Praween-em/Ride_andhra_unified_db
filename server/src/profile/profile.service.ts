@@ -10,6 +10,8 @@ import { DriverDocument, DocumentType, DocumentStatus } from './entities/driver-
 import { Ride } from '../rides/entities/ride.entity';
 import { User, UserRole } from '../auth/entities/user.entity';
 import { UpdateDriverStatusDto } from './dto/update-status.dto';
+import { DriverSubscription } from './entities/driver-subscription.entity';
+import { MoreThan } from 'typeorm';
 
 @Injectable()
 export class ProfileService {
@@ -22,6 +24,8 @@ export class ProfileService {
     private readonly driverDocumentRepository: Repository<DriverDocument>,
     @InjectRepository(Ride)
     private readonly rideRepository: Repository<Ride>,
+    @InjectRepository(DriverSubscription)
+    private readonly subscriptionRepository: Repository<DriverSubscription>,
   ) { }
 
   async getEarnings(userId: string) {
@@ -126,6 +130,18 @@ export class ProfileService {
     // Note: We'll use the API base URL from the client side, so we just return the relative path or ID
     const avatarUrl = profileImageDoc ? `/profile/documents/image/${profileImageDoc.id}` : null;
 
+    // Fetch active subscription
+    const subscription = await this.subscriptionRepository.findOne({
+      where: {
+        driverId: userId,
+        status: 'active',
+        endDate: MoreThan(new Date())
+      },
+      order: {
+        endDate: 'DESC'
+      }
+    });
+
     return {
       id: user.id,
       name: user.name,
@@ -147,6 +163,7 @@ export class ProfileService {
         avatar: avatarUrl,
         isOnline: driver?.isOnline || false,
         isAvailable: driver?.isAvailable || false,
+        subscriptionExpiry: subscription ? subscription.endDate.toISOString() : null,
       }
     };
   }

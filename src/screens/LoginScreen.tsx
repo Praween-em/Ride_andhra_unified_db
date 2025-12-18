@@ -85,7 +85,7 @@ const LoginScreen = ({ navigation }: { navigation: any }) => {
     }
 
     // BYPASS FOR GOOGLE PLAY VERIFICATION
-    if (phoneNumber === '9999999999') {
+    if (phoneNumber === '1234567890') {
       navigation.navigate('OtpVerification', {
         phoneNumber: `91${phoneNumber}`,
         reqId: 'TEST_REQ_ID_GOOGLE_VERIFY'

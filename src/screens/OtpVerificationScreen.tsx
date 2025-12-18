@@ -113,39 +113,47 @@ const OtpVerificationScreen = ({ route, navigation }: Props) => {
     }
 
     // BYPASS FOR GOOGLE PLAY VERIFICATION
-    if (phoneNumber.endsWith('9999999999') && otp === '123456') {
+    if (phoneNumber.endsWith('1234567890') && otp === '123456') {
       try {
+        console.log('DEBUG: Test credentials valid (Frontend Check). Logging in via login-by-phone.');
+        console.log('DEBUG: URI being called:', api.defaults.baseURL + '/auth/login-by-phone');
+
+        // Frontend validated the OTP (123456). Now just get the token from backend.
         const response = await api.post('/auth/login-by-phone', {
-          phoneNumber: '9999999999',
+          phoneNumber: '1234567890',
         });
 
-        // Save token for ALL users (required for authenticated API calls)
-        await AsyncStorage.setItem('token', response.data.token);
-        await AsyncStorage.setItem('phoneNumber', phoneNumber);
+        // The response structure from login-by-phone should be the same as verify-otp 
+        // (because verify-otp calls findOrCreateUserByPhone internally, just like login-by-phone does)
+        if (response.data) {
+          const { token, user, user_exists } = response.data;
 
-        if (response.data.user_exists) {
-          const { user } = response.data;
+          // Save token for ALL users
+          await AsyncStorage.setItem('token', token);
+          await AsyncStorage.setItem('phoneNumber', phoneNumber);
 
-          const hasDriverRole = user.roles && user.roles.includes('driver');
-          const isVerified = user.is_verified === true;
-          const hasDriverRecord = user.driver_id !== null && user.driver_id !== undefined;
+          if (user_exists) {
+            const hasDriverRole = user.roles && user.roles.includes('driver');
+            const isVerified = user.is_verified === true;
+            const hasDriverRecord = user.driver_id !== null && user.driver_id !== undefined;
 
-          if (hasDriverRole && isVerified && hasDriverRecord) {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Main' }],
-            });
+            if (hasDriverRole && isVerified && hasDriverRecord) {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Main' }],
+              });
+            } else {
+              navigation.navigate('DriverRegistrationStack', {
+                screen: 'DriverRegistration',
+                params: { phoneNumber: phoneNumber.replace('91', '') }
+              });
+            }
           } else {
             navigation.navigate('DriverRegistrationStack', {
               screen: 'DriverRegistration',
-              params: { phoneNumber }
+              params: { phoneNumber: phoneNumber.replace('91', '') }
             });
           }
-        } else {
-          navigation.navigate('DriverRegistrationStack', {
-            screen: 'DriverRegistration',
-            params: { phoneNumber }
-          });
         }
       } catch (error) {
         console.error('Test login error:', error);

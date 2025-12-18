@@ -8,10 +8,8 @@ export type RootStackParamList = {
     PrivacyPolicy: undefined;
     TermsOfService: undefined;
     MyRides: undefined;
-    Wallet: undefined;
     Support: undefined;
-    Referral: undefined;
-    Withdraw: undefined;
+
     ContactUs: undefined;
     Help: undefined;
     Payment: undefined;

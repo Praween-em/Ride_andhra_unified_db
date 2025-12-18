@@ -1,15 +1,41 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import RazorpayCheckout from 'react-native-razorpay';
-import { API_URL } from '../config/api';
+import api from '../config/api';
+import { Ionicons } from '@expo/vector-icons';
 
-const PaymentScreen = ({ navigation }) => {
+const PaymentScreen = ({ navigation }: any) => {
   const route = useRoute();
-  const { plan } = route.params;
+  const { plan }: any = route.params;
   const [loading, setLoading] = useState(false);
-  const [mobileNumber, setMobileNumber] = useState(null);
+  const [mobileNumber, setMobileNumber] = useState<string | null>(null);
+
+  // Constants for calculation
+  const GST_RATE = 0.18;
+  const COMMISSION_PER_RIDE = 10;
+  const RIDES_PER_DAY = 20;
+
+  // Calculate taxes and totals
+  const basePrice = parseFloat(plan.price);
+  const gstAmount = basePrice * GST_RATE;
+  const totalAmount = basePrice + gstAmount;
+
+  // Calculate Savings
+  const getSavingsDetails = () => {
+    let days = 1;
+    if (plan.name.includes('Weekly')) days = 7;
+    if (plan.name.includes('Monthly')) days = 30;
+
+    const totalRides = days * RIDES_PER_DAY;
+    const potentialCommission = totalRides * COMMISSION_PER_RIDE;
+    const savings = potentialCommission - totalAmount;
+
+    return { potentialCommission, savings, totalRides, days };
+  };
+
+  const { potentialCommission, savings, totalRides, days } = getSavingsDetails();
 
   useEffect(() => {
     const getMobileNumber = async () => {
@@ -32,42 +58,20 @@ const PaymentScreen = ({ navigation }) => {
 
     setLoading(true);
     try {
-      // Get JWT token for authentication
-      const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        Alert.alert('Error', 'Authentication token not found. Please log in again.');
-        navigation.goBack();
-        return;
-      }
-
-      // Step 1: Create order on backend
-      const orderResponse = await fetch(`${API_URL}/razorpay/create-order`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          amount: plan.price * 100, // Convert to paise
-          currency: 'INR',
-          receipt: `receipt_${Date.now()}`,
-        }),
+      // Step 1: Create order on backend (Use Total Amount)
+      const orderResponse = await api.post('/subscriptions/create-order', {
+        planId: plan.id,
       });
 
-      if (!orderResponse.ok) {
-        throw new Error('Failed to create order');
-      }
-
-      const orderData = await orderResponse.json();
-      console.log('Order created:', orderData);
+      const orderData = orderResponse.data;
 
       // Step 2: Open Razorpay Checkout
       const options = {
-        description: `${plan.name} - ${plan.validity}`,
-        image: 'https://i.imgur.com/3g7nmJC.jpg', // Replace with your app logo
+        description: `Subscription: ${plan.name}`,
+        image: 'https://i.imgur.com/3g7nmJC.jpg',
         currency: 'INR',
-        key: 'rzp_test_RpO2Zgt8T7ubJ4', // Razorpay Test Key (should match backend)
-        amount: orderData.amount,
+        key: orderData.key,
+        amount: orderData.amount, // This comes from backend in paise
         name: 'Ride Andhra',
         order_id: orderData.orderId,
         prefill: {
@@ -79,109 +83,136 @@ const PaymentScreen = ({ navigation }) => {
 
       const data = await RazorpayCheckout.open(options);
 
-      // Step 3: Payment successful, verify on backend
-      console.log('Payment success:', data);
+      // Step 3: Verify
       await verifyPayment(data, orderData.orderId);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Payment Error:', error);
-      if (error.code === 2) {
-        // User cancelled payment
+
+      // Axios error handling
+      if (error.response) {
+        const errorMsg = error.response.data?.message || 'Server error occurred';
+        Alert.alert('Payment Error', errorMsg);
+      } else if (error.code === 2) {
         Alert.alert('Payment Cancelled', 'You have cancelled the payment.');
       } else {
-        Alert.alert('Payment Failed', 'An error occurred during payment. Please try again.');
+        Alert.alert('Payment Failed', error.message || 'An error occurred.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const verifyPayment = async (paymentData, orderId) => {
+  const verifyPayment = async (paymentData: any, orderId: string) => {
     try {
-      const token = await AsyncStorage.getItem('token');
-
-      const verifyResponse = await fetch(`${API_URL}/razorpay/verify-payment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          razorpay_order_id: orderId,
-          razorpay_payment_id: paymentData.razorpay_payment_id,
-          razorpay_signature: paymentData.razorpay_signature,
-          planDetails: {
-            planName: plan.name,
-            amount: plan.price,
-            validity: plan.validity,
-          },
-        }),
+      await api.post('/subscriptions/verify', {
+        razorpay_order_id: orderId,
+        razorpay_payment_id: paymentData.razorpay_payment_id,
+        razorpay_signature: paymentData.razorpay_signature,
+        planId: plan.id
       });
 
-      if (!verifyResponse.ok) {
-        throw new Error('Payment verification failed');
-      }
-
-      const verifyData = await verifyResponse.json();
-      console.log('Verification response:', verifyData);
-
       Alert.alert(
-        'Payment Successful!',
-        `Your ${plan.name} subscription has been activated.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('Main'),
-          },
-        ]
+        'Success!',
+        `Your ${plan.name} is now active!`,
+        [{ text: 'OK', onPress: () => navigation.navigate('Main') }]
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Verification Error:', error);
-      Alert.alert(
-        'Verification Failed',
-        'Payment was successful but verification failed. Please contact support.',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('Main'),
-          },
-        ]
-      );
+      const errorMsg = error.response?.data?.message || 'Payment verification failed';
+      Alert.alert('Verification Failed', errorMsg + '. Contact support if amount was deducted.');
     }
   };
 
+
   if (!mobileNumber) {
     return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" />
-        <Text>Loading...</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#fe7009" />
       </View>
-    )
+    );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Complete Your Payment</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Order Summary</Text>
+      </View>
 
-        <View style={styles.planDetails}>
-          <Text style={styles.planName}>{plan.name}</Text>
-          <Text style={styles.planPrice}>₹{plan.price}</Text>
-          <Text style={styles.planValidity}>{plan.validity}</Text>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+
+        {/* Savings Banner */}
+        <View style={styles.savingsCard}>
+          <View style={styles.savingsHeader}>
+            <Text style={styles.savingsTitle}>YOU SAVE BIG!</Text>
+            <Ionicons name="pricetag" size={20} color="#D35400" style={{ marginLeft: 8 }} />
+          </View>
+          <Text style={styles.savingsSubtitle}>Save ₹10 commission on every ride!</Text>
+          <Text style={styles.savingsCalculation}>
+            Calculation: {totalRides} Rides ({days} days) × ₹10 = ₹{potentialCommission}
+          </Text>
+
+          <View style={styles.savingsRow}>
+            <View>
+              <Text style={styles.savingsLabel}>Standard Commission</Text>
+              <Text style={styles.strikethroughPrice}>₹{potentialCommission}</Text>
+            </View>
+            <View style={styles.arrowContainer}>
+              <Text style={styles.arrow}>→</Text>
+            </View>
+            <View>
+              <Text style={styles.savingsLabel}>You Pay Only</Text>
+              <Text style={styles.finalPriceSummary}>₹{totalAmount.toFixed(0)}</Text>
+            </View>
+          </View>
         </View>
 
+
+        {/* Bill Details */}
+        <View style={styles.billCard}>
+          <Text style={styles.billTitle}>Bill Details</Text>
+
+          <View style={styles.billRow}>
+            <Text style={styles.billLabel}>{plan.name} (Base Price)</Text>
+            <Text style={styles.billValue}>₹{basePrice.toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.billRow}>
+            <Text style={styles.billLabel}>GST (18%)</Text>
+            <Text style={styles.billValue}>₹{gstAmount.toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={[styles.billRow, { marginBottom: 0 }]}>
+            <Text style={styles.totalLabel}>Total Payable</Text>
+            <Text style={styles.totalValue}>₹{totalAmount.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        {/* Legal Disclaimer */}
+        <Text style={styles.disclaimer}>
+          * By proceeding, you agree to our Terms of Service.
+          GST of 18% is applicable on all digital services.
+        </Text>
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+
+      {/* Pay Button */}
+      <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.paymentButton, loading && styles.paymentButtonDisabled]}
+          style={[styles.payButton, loading && styles.disabledButton]}
           onPress={handleRazorpayPayment}
           disabled={loading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <>
-              <Image source={require('../assets/UPI.png')} style={styles.upiIcon} />
-              <Text style={styles.paymentButtonText}>Pay with Razorpay</Text>
-            </>
+            <Text style={styles.payButtonText}>Pay ₹{totalAmount.toFixed(2)}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -192,118 +223,179 @@ const PaymentScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#F5F7FA',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f2f5',
-    padding: 20,
   },
-  card: {
-    width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    padding: 25,
+  header: {
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#fff',
+    elevation: 2,
+  },
+  backButton: {
+    padding: 5,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginLeft: 15,
+    color: '#333',
+  },
+  content: {
+    padding: 20,
+    paddingBottom: 100, // Extra padding for scroll
+  },
+  savingsCard: {
+    backgroundColor: '#FFF0E6', // Light Orange
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FFD8BE',
+  },
+  savingsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  savingsTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#D35400',
+    letterSpacing: 0.5,
+  },
+  discountIcon: {
+    width: 20,
+    height: 20,
+    marginLeft: 8,
+    tintColor: '#D35400'
+  },
+  savingsSubtitle: {
+    fontSize: 14,
+    color: '#E67E22',
+    marginBottom: 5,
+  },
+  savingsCalculation: {
+    fontSize: 13,
+    color: '#D35400',
+    fontStyle: 'italic',
+    marginBottom: 15,
+  },
+  savingsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5, // Reduced bottom margin since badge is gone
+  },
+  savingsLabel: {
+    fontSize: 12,
+    color: '#7F8C8D',
+    marginBottom: 2,
+  },
+  strikethroughPrice: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#E74C3C',
+    textDecorationLine: 'line-through',
+  },
+  arrowContainer: {
+    justifyContent: 'center',
+  },
+  arrow: {
+    fontSize: 24,
+    color: '#BDC3C7',
+    fontWeight: 'bold',
+  },
+  finalPriceSummary: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#27AE60',
+  },
+  // Removed totalSavingsBadge styles
+  billCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 20,
+    elevation: 2,
     shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
   },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 20,
-  },
-  planDetails: {
-    width: '100%',
-    padding: 20,
-    backgroundColor: '#f8f9fa',
-    borderRadius: 10,
-    marginBottom: 25,
-    alignItems: 'center',
-  },
-  planName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fe7009',
-  },
-  planPrice: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginVertical: 10,
-  },
-  planValidity: {
+  billTitle: {
     fontSize: 16,
-    color: '#666',
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#2C3E50',
   },
-  paymentButton: {
+  billRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fe7009',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
-  paymentButtonDisabled: {
-    backgroundColor: '#ccc',
+  billLabel: {
+    fontSize: 14,
+    color: '#7F8C8D',
   },
-  upiIcon: {
-    width: 80,
-    height: 30,
-    resizeMode: 'contain',
-    marginRight: 10,
+  billValue: {
+    fontSize: 14,
+    color: '#2C3E50',
+    fontWeight: '600',
   },
-  paymentButtonText: {
-    color: '#fff',
+  divider: {
+    height: 1,
+    backgroundColor: '#ECF0F1',
+    marginVertical: 12,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  totalValue: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#2C3E50',
   },
-  // Modal styles
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
+  disclaimer: {
+    fontSize: 12,
+    color: '#95A5A6',
     textAlign: 'center',
-  },
-  appItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  appIcon: {
-    width: 40,
-    height: 40,
-    resizeMode: 'contain',
-    marginRight: 15,
-  },
-  appName: {
-    fontSize: 18,
-  },
-  closeButton: {
     marginTop: 20,
-    padding: 15,
-    backgroundColor: '#f44336',
-    borderRadius: 10,
-    alignItems: 'center',
+    lineHeight: 18,
+    marginBottom: 20,
   },
-  closeButtonText: {
+  footer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    elevation: 10,
+    marginBottom: 20, // Add bottom margin here as requested
+  },
+  payButton: {
+    backgroundColor: '#27AE60', // GREEN color
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#27AE60',
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+  },
+  disabledButton: {
+    backgroundColor: '#A9DFBF',
+  },
+  payButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
 });

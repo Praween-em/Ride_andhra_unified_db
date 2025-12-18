@@ -11,8 +11,24 @@ export class RidesController {
   constructor(private readonly ridesService: RidesService) { }
 
   @Post()
-  async create(@Body() createRideDto: CreateRideDto): Promise<Ride> {
-    return this.ridesService.create(createRideDto);
+  async create(@Body() createRideDto: CreateRideDto, @Req() req): Promise<Ride> {
+    const userId = req.user?.userId || req.user?.id;
+    return this.ridesService.create(createRideDto, userId);
+  }
+
+  @Post('fare')
+  getFare(
+    @Body()
+    body: { distance: number; duration: number; vehicleType: string },
+  ) {
+    if (!body.distance || !body.vehicleType) {
+      throw new Error('Missing distance or vehicleType');
+    }
+    return this.ridesService.calculateFare(
+      body.distance, // Ensure this assumes meters if service expects km, check service
+      body.duration,
+      body.vehicleType,
+    );
   }
 
   @Get()
@@ -34,6 +50,12 @@ export class RidesController {
       throw new Error('User not authenticated');
     }
     return this.ridesService.getPendingRidesForDriver(userId);
+  }
+
+  @Get('my-rides')
+  async getMyRides(@Req() req): Promise<Ride[]> {
+    const userId = req.user?.userId || req.user?.id;
+    return this.ridesService.getMyRides(userId);
   }
 
   @Get('driver-history')
@@ -93,5 +115,16 @@ export class RidesController {
   async completeRide(@Param('id') id: string, @Req() req): Promise<Ride> {
     const userId = req.user?.userId || req.user?.id;
     return this.ridesService.completeRide(id, userId);
+  }
+
+  @Patch(':id/cancel')
+  async cancelRide(@Param('id') id: string): Promise<any> {
+    return this.ridesService.cancelRide(id);
+  }
+
+  // Support for legacy/rider app which might use PATCH for accept
+  @Patch(':id/accept')
+  async acceptRidePatch(@Param('id') id: string, @Req() req): Promise<Ride> {
+    return this.acceptRide(id, req);
   }
 }

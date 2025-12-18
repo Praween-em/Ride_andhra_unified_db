@@ -22,11 +22,9 @@ import SubscriptionsScreen from '../screens/SubscriptionsScreen';
 import PrivacyPolicyScreen from '../screens/PrivacyPolicyScreen';
 import TermsOfServiceScreen from '../screens/TermsOfServiceScreen';
 import MyRidesScreen from '../screens/MyRidesScreen';
-import WalletScreen from '../screens/WalletScreen';
-import SupportScreen from '../screens/SupportScreen';
-import ReferralScreen from '../screens/ReferralScreen';
-import WithdrawScreen from '../screens/WithdrawScreen';
+
 import VerificationPendingScreen from '../screens/VerificationPendingScreen';
+import SupportScreen from '../screens/SupportScreen';
 import ContactUsScreen from '../screens/ContactUsScreen';
 import HelpScreen from '../screens/HelpScreen';
 import PaymentScreen from '../screens/PaymentScreen';
@@ -48,8 +46,8 @@ const HomeTabs = () => {
 
           if (route.name === 'Home') {
             iconName = focused ? 'home' : 'home-outline';
-          } else if (route.name === 'Earnings') {
-            iconName = focused ? 'cash' : 'cash';
+          } else if (route.name === 'History') {
+            iconName = focused ? 'history' : 'history';
           } else if (route.name === 'Rides') {
             iconName = focused ? 'motorbike' : 'motorbike'; // Using bicycle as proxy for rides/scooter
           } else if (route.name === 'Profile') {
@@ -64,7 +62,7 @@ const HomeTabs = () => {
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
       <Tab.Screen name="Rides" component={RidesScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="Earnings" component={EarningsScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="History" component={MyRidesScreen} options={{ headerShown: false, title: 'Ride History' }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
     </Tab.Navigator>
   );
@@ -113,6 +111,12 @@ const AppNavigator = () => {
 
             setUser(userData);
             setHasDriverRole(hasDriverRole);
+
+            if (userData.profile?.subscriptionExpiry) {
+              await AsyncStorage.setItem('subscriptionExpiry', userData.profile.subscriptionExpiry);
+            } else {
+              await AsyncStorage.removeItem('subscriptionExpiry');
+            }
 
             // User can access home if: is_verified=true AND driver_id exists
             const canAccessHome = isVerified && hasDriverRecord && hasDriverRole;
@@ -191,6 +195,10 @@ const AppNavigator = () => {
             <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} options={{ headerShown: false }} />
             <Stack.Screen name="DriverRegistrationStack" component={DriverRegistrationStack} options={{ headerShown: false }} />
             <Stack.Screen name="VerificationPending" component={VerificationPendingScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Subscriptions" component={SubscriptionsScreen} options={{ headerShown: false }} />
+            <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment', headerShown: false }} />
+            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ title: 'Privacy Policy' }} />
+            <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ title: 'Terms of Service' }} />
           </>
         ) : (
           // Main App Stack - Only show when authenticated as APPROVED DRIVER
@@ -200,10 +208,7 @@ const AppNavigator = () => {
             <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ title: 'Privacy Policy' }} />
             <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} options={{ title: 'Terms of Service' }} />
             <Stack.Screen name="MyRides" component={MyRidesScreen} options={{ title: 'My Rides' }} />
-            <Stack.Screen name="Wallet" component={WalletScreen} options={{ headerShown: false }} />
             <Stack.Screen name="Support" component={SupportScreen} options={{ title: 'Support' }} />
-            <Stack.Screen name="Referral" component={ReferralScreen} options={{ headerShown: false }} />
-            <Stack.Screen name="Withdraw" component={WithdrawScreen} options={{ headerShown: false }} />
             <Stack.Screen name="ContactUs" component={ContactUsScreen} options={{ title: 'Contact Us' }} />
             <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'Help' }} />
             <Stack.Screen name="Payment" component={PaymentScreen} options={{ title: 'Payment' }} />

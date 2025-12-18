@@ -10,14 +10,14 @@ export class WalletController {
   constructor(private readonly walletService: WalletService) { }
 
   @Get()
-  getWalletBalance(@Req() req: Request) {
-    const userId = req.user.sub;
+  getWalletBalance(@Req() req: any) {
+    const userId = req.user.userId;
     return this.walletService.getWalletBalance(userId);
   }
 
   @Post('add-funds')
-  addFunds(@Body() getWalletDto: GetWalletDto, @Req() req: Request) {
-    const userId = req.user.sub;
+  addFunds(@Body() getWalletDto: GetWalletDto, @Req() req: any) {
+    const userId = req.user.userId;
     return this.walletService.addFunds(userId, getWalletDto.amount);
   }
 }

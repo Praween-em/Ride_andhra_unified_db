@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Notification } from './entities/notification.entity';
+import { Notification, NotificationType } from './entities/notification.entity';
 import { User } from '../auth/entities/user.entity';
 import { Driver } from '../profile/entities/driver.entity';
 import { Ride } from '../rides/entities/ride.entity';
@@ -9,6 +9,7 @@ import Expo from 'expo-server-sdk';
 import { InjectConnection } from '@nestjs/typeorm';
 import { Connection } from 'typeorm';
 import { RidesService } from '../rides/rides.service';
+import { NotificationsGateway } from './notifications.gateway';
 
 @Injectable()
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
@@ -21,6 +22,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     @InjectConnection() private readonly connection: Connection,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {
     this.expo = new Expo();
   }
@@ -138,10 +140,14 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       const tickets = await this.expo.sendPushNotificationsAsync([message]);
       console.log(`Sent ride notification to driver ${driver.user_id}:`, tickets);
 
+      // WebSocket broadcast for the ride
+      this.notificationsGateway.sendRideUpdate(ride.id, 'ride_request', message.data);
+
       // Create notification record in database
       const notification = this.notificationRepository.create({
         user: driver.user,
         ride: ride,
+        type: NotificationType.RIDE_REQUEST,
         title: message.title,
         message: message.body,
         data: message.data,
@@ -192,10 +198,14 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
       const tickets = await this.expo.sendPushNotificationsAsync([message]);
       console.log(`Sent ride accepted notification to user ${userId}:`, tickets);
 
+      // WebSocket broadcast
+      this.notificationsGateway.sendRideUpdate(ride.id, 'ride_accepted', message.data);
+
       // Create notification record in database
       const notification = this.notificationRepository.create({
         user: user,
         ride: ride,
+        type: NotificationType.RIDE_UPDATE,
         title: message.title,
         message: message.body,
         data: message.data,
@@ -227,7 +237,8 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 
     try {
       await this.expo.sendPushNotificationsAsync([message]);
-      await this.saveNotification(user, ride, message);
+      this.notificationsGateway.sendRideUpdate(ride.id, 'ride_started', message.data);
+      await this.saveNotification(user, ride, message, NotificationType.RIDE_UPDATE);
     } catch (error) {
       console.error(`Error sending ride started notification:`, error);
     }
@@ -247,16 +258,18 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 
     try {
       await this.expo.sendPushNotificationsAsync([message]);
-      await this.saveNotification(user, ride, message);
+      this.notificationsGateway.sendRideUpdate(ride.id, 'ride_completed', message.data);
+      await this.saveNotification(user, ride, message, NotificationType.RIDE_UPDATE);
     } catch (error) {
       console.error(`Error sending ride completed notification:`, error);
     }
   }
 
-  private async saveNotification(user: User, ride: Ride, message: any) {
+  private async saveNotification(user: User, ride: Ride, message: any, type: NotificationType) {
     const notification = this.notificationRepository.create({
       user,
       ride,
+      type,
       title: message.title,
       message: message.body,
       data: message.data,

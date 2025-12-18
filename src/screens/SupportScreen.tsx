@@ -11,11 +11,11 @@ const SupportScreen = () => {
   const [message, setMessage] = useState('');
 
   const handleCallSupport = () => {
-    Linking.openURL('tel:+919876543210'); // Replace with actual number
+    Linking.openURL('tel:+918374277617'); // Replace with actual number
   };
 
   const handleEmailSupport = () => {
-    Linking.openURL('mailto:support@rideandhra.com'); // Replace with actual email
+    Linking.openURL('mailto:help.rideandhra@gmail.com'); // Replace with actual email
   };
 
   const handleSubmitTicket = () => {
@@ -43,7 +43,7 @@ const SupportScreen = () => {
               <Ionicons name="call" size={24} color="#fe7009" />
             </View>
             <Text style={styles.contactLabel}>Call Support</Text>
-            <Text style={styles.contactValue}>+91 98765 43210</Text>
+            <Text style={styles.contactValue}>+91 83742 77617</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.contactCard} onPress={handleEmailSupport}>
@@ -51,7 +51,7 @@ const SupportScreen = () => {
               <MaterialIcons name="email" size={24} color="#fe7009" />
             </View>
             <Text style={styles.contactLabel}>Email Support</Text>
-            <Text style={styles.contactValue}>support@rideandhra.com</Text>
+            <Text style={styles.contactValue}>help.rideandhra@gmail.com</Text>
           </TouchableOpacity>
         </View>
 

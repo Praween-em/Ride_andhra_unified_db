@@ -64,20 +64,20 @@ export class ProfileController {
   }
 
   @Put('driver/status')
-  async updateDriverStatus(@Body() updateDriverStatusDto: UpdateDriverStatusDto, @Req() req: Request) { // Type req as Request
-    const userId = req.user.sub;
+  async updateDriverStatus(@Body() updateDriverStatusDto: UpdateDriverStatusDto, @Req() req: any) {
+    const userId = req.user.userId;
     return this.profileService.updateDriverStatus(userId, updateDriverStatusDto);
   }
 
   @Put('push-token')
-  async updatePushToken(@Body() body: { token: string }, @Req() req: Request) {
-    const userId = req.user.sub;
+  async updatePushToken(@Body() body: { token: string }, @Req() req: any) {
+    const userId = req.user.userId;
     return this.profileService.updatePushToken(userId, body.token);
   }
 
   @Get('earnings')
-  async getEarnings(@Req() req: Request) {
-    const userId = req.user.sub;
+  async getEarnings(@Req() req: any) {
+    const userId = req.user.userId;
     return this.profileService.getDriverEarnings(userId);
   }
 
@@ -150,9 +150,9 @@ export class ProfileController {
   async verifyDocument(
     @Param('documentId') documentId: string,
     @Body() verifyDocumentDto: VerifyDocumentDto,
-    @Req() req: Request
+    @Req() req: any
   ) {
-    const verifiedBy = req.user.sub;
+    const verifiedBy = req.user.userId;
     return this.profileService.verifyDocument(documentId, verifyDocumentDto, verifiedBy);
   }
 

@@ -144,8 +144,8 @@ export class Ride {
   cancelledAt: Date;
 
   // Rider PIN verification fields
-  @Column({ name: 'rider_pin_entered_by_driver', nullable: true })
-  riderPinEnteredByDriver: string;
+  @Column({ name: 'rider_pin_entered_by_driver', default: false })
+  riderPinEnteredByDriver: boolean;
 
   @Column({ type: 'timestamp', name: 'rider_pin_verified_at', nullable: true })
   riderPinVerifiedAt: Date;

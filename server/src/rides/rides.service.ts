@@ -4,9 +4,13 @@ import { Repository, EntityManager } from 'typeorm';
 import { CreateRideDto } from './dto/create-ride.dto';
 import { UpdateRideDto } from './dto/update-ride.dto';
 import { Ride, RideStatus } from './entities/ride.entity';
+import { FareSetting, VehicleType } from './entities/fare-setting.entity';
 import { RideRejection } from './entities/ride-rejection.entity';
 import { Driver } from '../profile/entities/driver.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { DriverSubscription } from '../profile/entities/driver-subscription.entity';
+import { FareTier } from './entities/fare-tier.entity';
+import { MoreThan } from 'typeorm';
 
 @Injectable()
 export class RidesService {
@@ -17,14 +21,43 @@ export class RidesService {
     private readonly rideRejectionRepository: Repository<RideRejection>,
     @InjectRepository(Driver)
     private readonly driverRepository: Repository<Driver>,
+    @InjectRepository(FareSetting)
+    private readonly fareSettingRepository: Repository<FareSetting>,
+    @InjectRepository(FareTier)
+    private readonly fareTierRepository: Repository<FareTier>,
     private readonly entityManager: EntityManager,
     @Inject(forwardRef(() => NotificationsService))
     private readonly notificationsService: NotificationsService,
   ) { }
 
-  async create(createRideDto: CreateRideDto): Promise<Ride> {
-    const newRide = this.rideRepository.create(createRideDto);
-    return this.rideRepository.save(newRide);
+  async create(createRideDto: CreateRideDto, userId?: string): Promise<Ride> {
+    // Map fields for compatibility between Rider and Driver apps
+    const rideData: any = {
+      ...createRideDto,
+      riderId: userId || createRideDto.riderId,
+      pickupLocation: createRideDto.pickupLocation || createRideDto.pickup_address,
+      pickupLatitude: createRideDto.pickupLatitude || createRideDto.pickup_latitude,
+      pickupLongitude: createRideDto.pickupLongitude || createRideDto.pickup_longitude,
+      dropoffLocation: createRideDto.dropoffLocation || createRideDto.dropoff_address,
+      dropoffLatitude: createRideDto.dropoffLatitude || createRideDto.dropoff_latitude,
+      dropoffLongitude: createRideDto.dropoffLongitude || createRideDto.dropoff_longitude,
+      vehicleType: createRideDto.vehicleType || createRideDto.vehicle_type,
+      status: RideStatus.PENDING,
+    };
+
+    const newRide = this.rideRepository.create(rideData as Partial<Ride>);
+    const savedRide = await this.rideRepository.save(newRide);
+
+    // Immediately notify the first available driver
+    setImmediate(async () => {
+      try {
+        await this.notifyNextDriver(savedRide.id);
+      } catch (error) {
+        console.error('Error in initial driver notification:', error);
+      }
+    });
+
+    return savedRide;
   }
 
   async findAll(): Promise<Ride[]> {
@@ -42,6 +75,98 @@ export class RidesService {
     }
     ride.status = updateRideDto.status;
     return this.rideRepository.save(ride);
+  }
+
+  async cancelRide(rideId: string): Promise<Ride> {
+    const ride = await this.findOne(rideId);
+    if (!ride) throw new NotFoundException('Ride not found');
+
+    ride.status = RideStatus.CANCELLED;
+    ride.cancelledAt = new Date();
+    // Logic for cancellation reason/fee could be added here
+    return this.rideRepository.save(ride);
+  }
+
+  async getMyRides(userId: string): Promise<Ride[]> {
+    return this.rideRepository.find({
+      where: { riderId: userId },
+      relations: ['driver', 'driver.user'],
+      order: { createdAt: 'DESC' }
+    });
+  }
+
+  async calculateFare(
+    distanceKm: number,
+    durationMin: number,
+    vehicleTypeStr: string,
+  ): Promise<number> {
+    console.log(`[CalculateFare] Start: ${vehicleTypeStr}, Dist: ${distanceKm}, Dur: ${durationMin}`);
+    try {
+      // Normalize vehicle type
+      const vehicleType = vehicleTypeStr.toLowerCase().replace('-', '_') as VehicleType;
+      console.log(`[CalculateFare] Normalized type: ${vehicleType}`);
+
+      const settings = await this.fareSettingRepository.findOne({
+        where: { vehicle_type: vehicleType, is_active: true }
+      });
+
+      if (!settings) {
+        console.warn(`[CalculateFare] No fare settings found for ${vehicleType}. Using default/zero.`);
+        return 0;
+      }
+      console.log(`[CalculateFare] Found settings:`, settings);
+
+      // Explicitly parse decimals to avoid string concatenation issues
+      const baseFare = Number(settings.base_fare);
+      const perKm = Number(settings.per_km_rate);
+      const perMin = Number(settings.per_minute_rate);
+      const minFare = Number(settings.minimum_fare);
+      const surge = Number(settings.surge_multiplier || 1);
+
+      let fare = baseFare;
+
+      // Check for tiered pricing
+      console.log(`[CalculateFare] Checking tiers for setting ID: ${settings.id}`);
+      const tiers = await this.fareTierRepository.find({
+        where: { fareSettingId: settings.id },
+        order: { km_from: 'ASC' }
+      });
+      console.log(`[CalculateFare] Found ${tiers.length} tiers`);
+
+      if (tiers.length > 0) {
+        let remainingDistance = distanceKm;
+        let totalTierCost = 0;
+
+        for (const tier of tiers) {
+          if (remainingDistance <= 0) break;
+
+          const distanceInTier = Math.min(remainingDistance, Number(tier.km_to) - Number(tier.km_from));
+          totalTierCost += distanceInTier * Number(tier.per_km_rate);
+          remainingDistance -= distanceInTier;
+        }
+
+        // If there's still distance left after the last tier, use the base per_km_rate
+        if (remainingDistance > 0) {
+          totalTierCost += remainingDistance * perKm;
+        }
+        fare += totalTierCost;
+      } else {
+        // Linear calculation fallback
+        fare += (distanceKm * perKm);
+      }
+
+      fare += (durationMin * perMin);
+      fare = Math.max(fare, minFare);
+      fare = fare * surge;
+
+      const finalFare = Number(fare.toFixed(2));
+      console.log(`[CalculateFare] Final Fare: ${finalFare}`);
+      return finalFare;
+
+    } catch (error) {
+      console.error('[CalculateFare] Error:', error);
+      throw error;
+    }
   }
 
   /**
@@ -92,7 +217,7 @@ export class RidesService {
 
       let targetDriverVehicleTypes: string[] = [];
 
-      switch (requiredVehicleType.toLowerCase()) {
+      switch (requiredVehicleType.trim().toLowerCase()) {
         case 'parcel':
           targetDriverVehicleTypes = ['bike'];
           break;
@@ -227,6 +352,19 @@ export class RidesService {
 
       if (!driver) {
         throw new NotFoundException('Driver not found');
+      }
+
+      // Check for active subscription
+      const subscription = await transactionalEntityManager.findOne(DriverSubscription, {
+        where: {
+          driverId: userId,
+          status: 'active',
+          endDate: MoreThan(new Date())
+        }
+      });
+
+      if (!subscription) {
+        throw new ConflictException('Active subscription required to accept rides.');
       }
 
       ride.driver = driver;
@@ -389,7 +527,29 @@ export class RidesService {
     // Calculate final fare (Stub - ideally use distance/time)
     // For now, keep the estimated fare or implement logic here
     if (!ride.finalFare) {
-      ride.finalFare = ride.fare; // Use estimated fare as final if not updated
+      // Calculate actual fare based on recorded start/complete times and distance
+      // If actualDistance is not set (e.g. from frontend), fallback to distance (estimated)
+      const distance = Number(ride.actualDistance || ride.distance || 0);
+
+      // Calculate duration in minutes from timestamps
+      let duration = ride.actualDuration;
+      if (!duration && ride.startedAt && ride.completedAt) {
+        const diffMs = ride.completedAt.getTime() - ride.startedAt.getTime();
+        duration = Math.ceil(diffMs / (1000 * 60));
+      }
+      duration = Number(duration || ride.duration || 0);
+
+      try {
+        const calculated = await this.calculateFare(distance, duration, ride.vehicleType);
+        if (calculated > 0) {
+          ride.finalFare = calculated;
+        } else {
+          ride.finalFare = ride.fare; // Fallback to estimated
+        }
+      } catch (e) {
+        console.error("Fare calculation error:", e);
+        ride.finalFare = ride.fare;
+      }
     }
 
     const savedRide = await this.rideRepository.save(ride);

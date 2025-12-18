@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from 'react-native-paper';
 import api from '../config/api';
 
-const VerificationPendingScreen = ({ navigation }) => {
+const VerificationPendingScreen = ({ navigation }: any) => {
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {

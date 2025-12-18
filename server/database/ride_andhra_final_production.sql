@@ -292,6 +292,35 @@ CREATE TABLE IF NOT EXISTS ride_ratings (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+
+-- SUBSCRIPTIONS (Added per request)
+CREATE TABLE IF NOT EXISTS subscription_plans (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    price DECIMAL(10,2) NOT NULL,
+    duration_days INTEGER NOT NULL, -- e.g. 30 for monthly
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS driver_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    driver_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    plan_id UUID REFERENCES subscription_plans(id) ON DELETE SET NULL,
+    start_date TIMESTAMPTZ DEFAULT NOW(),
+    end_date TIMESTAMPTZ NOT NULL,
+    status VARCHAR(20) DEFAULT 'active', -- active, expired, cancelled
+    is_paid BOOLEAN DEFAULT FALSE,       -- "Yes" if paid
+    payment_id UUID REFERENCES payments(id),
+    razorpay_payment_id VARCHAR(255),
+    auto_renew BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT driver_subscriptions_status_check CHECK (status IN ('active', 'expired', 'cancelled'))
+);
+
 -- OTPS (Legacy support)
 CREATE TABLE IF NOT EXISTS otps (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -344,7 +373,8 @@ DECLARE t TEXT;
 BEGIN
     FOR t IN SELECT unnest(ARRAY[
         'users','rider_profiles','driver_profiles','rides','payments','wallets',
-        'fare_settings','driver_documents','notifications','ride_ratings'
+        'fare_settings','driver_documents','notifications','ride_ratings',
+        'subscription_plans','driver_subscriptions'
     ]) LOOP
         EXECUTE format('DROP TRIGGER IF EXISTS set_%s_timestamp ON %s;', t, t);
         EXECUTE format('CREATE TRIGGER set_%s_timestamp BEFORE UPDATE ON %s FOR EACH ROW EXECUTE FUNCTION trigger_set_timestamp();', t, t);
@@ -368,11 +398,13 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS sync_ride_geography ON rides;
 CREATE TRIGGER sync_ride_geography
 BEFORE INSERT OR UPDATE ON rides
 FOR EACH ROW
 EXECUTE FUNCTION trigger_sync_geography();
 
+DROP TRIGGER IF EXISTS sync_driver_geography ON driver_profiles;
 CREATE TRIGGER sync_driver_geography
 BEFORE INSERT OR UPDATE ON driver_profiles
 FOR EACH ROW
@@ -402,6 +434,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS create_user_dependents ON users;
 CREATE TRIGGER create_user_dependents
 AFTER INSERT ON users
 FOR EACH ROW
@@ -455,3 +488,16 @@ VALUES
 
 
 ON CONFLICT (vehicle_type) DO NOTHING;
+
+-- DATA SEEDING (Subscription Plans)
+INSERT INTO subscription_plans (name, description, price, duration_days, is_active)
+SELECT 'Monthly Access', 'Full access to ride requests for 30 days', 499.00, 30, TRUE
+WHERE NOT EXISTS (SELECT 1 FROM subscription_plans WHERE name = 'Monthly Access');
+
+INSERT INTO subscription_plans (name, description, price, duration_days, is_active)
+SELECT 'Weekly Access', 'Full access to ride requests for 7 days', 149.00, 7, TRUE
+WHERE NOT EXISTS (SELECT 1 FROM subscription_plans WHERE name = 'Weekly Access');
+
+INSERT INTO subscription_plans (name, description, price, duration_days, is_active)
+SELECT 'Daily Pass', 'Full access to ride requests for 24 hours', 24.00, 1, TRUE
+WHERE NOT EXISTS (SELECT 1 FROM subscription_plans WHERE name = 'Daily Pass');

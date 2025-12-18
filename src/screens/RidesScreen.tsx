@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions, Alert, ActivityIndicator, Modal, TextInput } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Card } from 'react-native-paper';
@@ -111,6 +112,24 @@ const RidesScreen = ({ navigation }: { navigation: any }) => {
     };
 
     const handleAccept = async (rideId: string) => {
+        // Check Subscription First
+        const expiryString = await AsyncStorage.getItem('subscriptionExpiry');
+        const now = new Date();
+        const expiry = expiryString ? new Date(expiryString) : null;
+        const hasValidSubscription = expiry && expiry > now;
+
+        if (!hasValidSubscription) {
+            Alert.alert(
+                'Subscription Required',
+                'You need an active subscription to accept rides. Please choose a plan.',
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Subscribe', onPress: () => navigation.navigate('Subscriptions') }
+                ]
+            );
+            return;
+        }
+
         try {
             setActionLoading(rideId);
             // Stop the looping alert sound
@@ -147,6 +166,21 @@ const RidesScreen = ({ navigation }: { navigation: any }) => {
         } catch (error: any) {
             console.error('Error starting ride:', error);
             Alert.alert('Error', error.response?.data?.message || 'Failed to start ride');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const handleCancelRide = async () => {
+        try {
+            setActionLoading('cancel');
+            await api.patch(`/rides/${currentRide?.id}/cancel`);
+            Alert.alert('Ride Cancelled', 'The ride has been cancelled.');
+            setCurrentRide(null);
+            fetchPendingRides();
+        } catch (error: any) {
+            console.error('Error cancelling ride:', error);
+            Alert.alert('Error', error.response?.data?.message || 'Failed to cancel ride');
         } finally {
             setActionLoading(null);
         }
@@ -225,21 +259,59 @@ const RidesScreen = ({ navigation }: { navigation: any }) => {
                     {/* Actions */}
                     <View style={styles.actionButtons}>
                         {currentRide?.status === 'accepted' && (
-                            <TouchableOpacity
-                                style={styles.acceptButton}
-                                onPress={() => setPinModalVisible(true)}
-                            >
-                                <Text style={styles.acceptButtonText}>START TRIP</Text>
-                            </TouchableOpacity>
+                            <>
+                                <TouchableOpacity
+                                    style={[styles.rejectButton, { marginRight: 10 }]}
+                                    onPress={() => Alert.alert(
+                                        'Cancel Ride',
+                                        'Are you sure you want to cancel this ride?',
+                                        [
+                                            { text: 'No', style: 'cancel' },
+                                            { text: 'Yes, Cancel', style: 'destructive', onPress: handleCancelRide }
+                                        ]
+                                    )}
+                                    disabled={loading}
+                                >
+                                    <Text style={styles.rejectButtonText}>CANCEL</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.acceptButton}
+                                    onPress={() => setPinModalVisible(true)}
+                                >
+                                    <Text style={styles.acceptButtonText}>START TRIP</Text>
+                                </TouchableOpacity>
+                            </>
                         )}
                         {currentRide?.status === 'in_progress' && (
-                            <TouchableOpacity
-                                style={[styles.acceptButton, { backgroundColor: '#28a745' }]}
-                                onPress={handleCompleteRide}
-                                disabled={actionLoading === 'complete'}
-                            >
-                                {actionLoading === 'complete' ? <ActivityIndicator color="#fff" /> : <Text style={styles.acceptButtonText}>COMPLETE TRIP</Text>}
-                            </TouchableOpacity>
+                            <View style={{ width: '100%' }}>
+                                <View style={styles.paymentReminderBox}>
+                                    <Text style={styles.paymentReminderText}>💬 Please collect payment directly from the rider</Text>
+                                    <Text style={styles.paymentReminderSubtext}>Cash / Rider UPI</Text>
+                                </View>
+                                <View style={styles.actionButtons}>
+                                    <TouchableOpacity
+                                        style={[styles.rejectButton, { marginRight: 10 }]}
+                                        onPress={() => Alert.alert(
+                                            'Cancel Ride',
+                                            'Are you sure you want to cancel this ongoing ride?',
+                                            [
+                                                { text: 'No', style: 'cancel' },
+                                                { text: 'Yes, Cancel', style: 'destructive', onPress: handleCancelRide }
+                                            ]
+                                        )}
+                                        disabled={actionLoading === 'cancel'}
+                                    >
+                                        <Text style={styles.rejectButtonText}>CANCEL</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity
+                                        style={[styles.acceptButton, { backgroundColor: '#28a745' }]}
+                                        onPress={handleCompleteRide}
+                                        disabled={actionLoading === 'complete'}
+                                    >
+                                        {actionLoading === 'complete' ? <ActivityIndicator color="#fff" /> : <Text style={styles.acceptButtonText}>COMPLETE TRIP</Text>}
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
                         )}
                     </View>
                 </Card.Content>
@@ -291,7 +363,7 @@ const RidesScreen = ({ navigation }: { navigation: any }) => {
     return (
         <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>{currentRide ? 'Current Ride' : 'Ride Requests'}</Text>
+                <Text style={styles.headerTitle}>{currentRide ? 'Current Ride' : 'Rides Feed'}</Text>
                 <TouchableOpacity onPress={() => { fetchPendingRides(); fetchCurrentRide(); }} disabled={loading}>
                     <Ionicons name="refresh" size={24} color="#1a202c" />
                 </TouchableOpacity>
@@ -341,9 +413,14 @@ const RidesScreen = ({ navigation }: { navigation: any }) => {
                                             </View>
                                         </View>
                                         <View style={styles.fareContainer}>
+                                            <Text style={styles.fareLabel}>Estimated Fare</Text>
                                             <Text style={styles.fareText}>₹{ride.fare}</Text>
-                                            <Text style={styles.paymentType}>Cash</Text>
+                                            <Text style={styles.paymentType}>Direct Payment</Text>
                                         </View>
+                                    </View>
+
+                                    <View style={styles.disclaimerBox}>
+                                        <Text style={styles.disclaimerText}>💡 Estimated fare only. Collect full payment directly from rider.</Text>
                                     </View>
 
                                     <View style={styles.divider} />
@@ -687,6 +764,46 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontWeight: 'bold',
         fontSize: 16,
+    },
+    fareLabel: {
+        fontSize: 10,
+        fontWeight: 'bold',
+        color: '#a0aec0',
+        textAlign: 'right',
+        marginBottom: 2,
+    },
+    disclaimerBox: {
+        backgroundColor: '#FFF9E6',
+        borderLeftWidth: 3,
+        borderLeftColor: '#fe7009',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 15,
+    },
+    disclaimerText: {
+        fontSize: 12,
+        color: '#4a5568',
+        fontWeight: '500',
+    },
+    paymentReminderBox: {
+        backgroundColor: '#E6F9ED',
+        borderLeftWidth: 3,
+        borderLeftColor: '#28a745',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 15,
+        width: '100%',
+    },
+    paymentReminderText: {
+        fontSize: 14,
+        color: '#1a202c',
+        fontWeight: 'bold',
+        marginBottom: 4,
+    },
+    paymentReminderSubtext: {
+        fontSize: 12,
+        color: '#4a5568',
+        fontStyle: 'italic',
     },
 });
 
