@@ -6,10 +6,10 @@ import { Ride } from './entities/ride.entity';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('rides')
-@UseGuards(JwtAuthGuard) // Protect all routes with JWT authentication
 export class RidesController {
   constructor(private readonly ridesService: RidesService) { }
 
+  @UseGuards(JwtAuthGuard)
   @Post()
   async create(@Body() createRideDto: CreateRideDto, @Req() req): Promise<Ride> {
     const userId = req.user?.userId || req.user?.id;
@@ -42,18 +42,21 @@ export class RidesController {
     return this.ridesService.getFareEstimates(body.distance, body.duration || 0);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get()
   async findAll(): Promise<Ride[]> {
     return this.ridesService.findAll();
   }
 
   // IMPORTANT: Specific routes must come BEFORE parameterized routes
+  @UseGuards(JwtAuthGuard)
   @Get('current')
   async getCurrentRide(@Req() req): Promise<Ride | null> {
     const userId = req.user?.userId || req.user?.id;
     return this.ridesService.getCurrentRide(userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('pending')
   async getPendingRides(@Req() req): Promise<Ride[]> {
     const userId = req.user?.userId || req.user?.id;
@@ -63,12 +66,14 @@ export class RidesController {
     return this.ridesService.getPendingRidesForDriver(userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('my-rides')
   async getMyRides(@Req() req): Promise<Ride[]> {
     const userId = req.user?.userId || req.user?.id;
     return this.ridesService.getMyRides(userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('driver-history')
   async getDriverHistory(@Req() req): Promise<Ride[]> {
     const userId = req.user?.userId || req.user?.id;
@@ -83,11 +88,13 @@ export class RidesController {
     return this.ridesService.getHighBookingZones();
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   async findOne(@Param('id') id: string): Promise<Ride> {
     return this.ridesService.findOne(id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   async update(
     @Param('id') id: string,
@@ -98,6 +105,7 @@ export class RidesController {
 
 
 
+  @UseGuards(JwtAuthGuard)
   @Post(':id/accept')
   async acceptRide(@Param('id') id: string, @Req() req): Promise<Ride> {
     const userId = req.user?.userId || req.user?.id;
@@ -107,6 +115,7 @@ export class RidesController {
     return this.ridesService.acceptRide(id, userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':id/decline')
   async declineRide(@Param('id') id: string, @Req() req): Promise<any> {
     const userId = req.user?.userId || req.user?.id;
@@ -116,24 +125,28 @@ export class RidesController {
     return this.ridesService.declineRide(id, userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':id/start')
   async startRide(@Param('id') id: string, @Body('pin') pin: string, @Req() req): Promise<Ride> {
     const userId = req.user?.userId || req.user?.id;
     return this.ridesService.startRide(id, userId, pin);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post(':id/complete')
   async completeRide(@Param('id') id: string, @Req() req): Promise<Ride> {
     const userId = req.user?.userId || req.user?.id;
     return this.ridesService.completeRide(id, userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch(':id/cancel')
   async cancelRide(@Param('id') id: string): Promise<any> {
     return this.ridesService.cancelRide(id);
   }
 
   // Support for legacy/rider app which might use PATCH for accept
+  @UseGuards(JwtAuthGuard)
   @Patch(':id/accept')
   async acceptRidePatch(@Param('id') id: string, @Req() req): Promise<Ride> {
     return this.acceptRide(id, req);
