@@ -46,25 +46,34 @@ export class AuthService {
     const payload = {
       phoneNumber: user.phone_number,
       sub: user.id,
-      roles: user.roles
+      roles: user.roles,
+      name: user.name || '',
     };
     return this.jwtService.sign(payload);
   }
 
   private async findOrCreateUserByPhone(phoneNumber: string) {
+    console.log(`DEBUG: findOrCreateUserByPhone lookup for: "${phoneNumber}"`);
+    
     // Find user or create if they don't exist
-    // Explicitly don't load relations to avoid complex SQL queries
     let user = await this.userRepository.findOne({
       where: { phone_number: phoneNumber },
-      relations: [] // Prevent eager loading of relations
+      relations: []
     });
+    
     const user_exists = !!user;
+    console.log(`DEBUG: DB lookup result: ${user_exists ? 'FOUND' : 'NOT FOUND'}`);
 
     if (!user) {
+      console.log(`DEBUG: Creating NEW user in database for: ${phoneNumber}`);
       const newUser = this.userRepository.create({
         phone_number: phoneNumber,
+        name: '', // Initialize name as empty string
+        roles: [UserRole.RIDER],
       });
       user = await this.userRepository.save(newUser);
+    } else {
+      console.log(`DEBUG: Existing user fetched: ID=${user.id}, Name="${user.name}"`);
     }
 
     // Check if user has a driver profile
@@ -74,15 +83,15 @@ export class AuthService {
 
     const token = await this.generateJwtToken(user);
 
-    return {
+    const response = {
       message: user_exists ? 'Login successful' : 'User registered successfully',
       token,
       accessToken: token, // Alias for Rider App
-      isNewUser: !user_exists, // Alias for Rider App
+      isNewUser: !user_exists, // CRITICAL: This determines if EnterNameScreen shows
       user: {
         id: user.id,
         phone_number: user.phone_number,
-        name: user.name,
+        name: user.name || '', // Ensure name is never null
         roles: user.roles,
         is_rider: user.roles.includes(UserRole.RIDER) || !driverProfile,
         is_driver: !!driverProfile || user.roles.includes(UserRole.DRIVER),
@@ -92,6 +101,9 @@ export class AuthService {
       },
       user_exists,
     };
+
+    console.log(`DEBUG: Final Auth Response for ${phoneNumber} - isNewUser: ${response.isNewUser}, Name: "${response.user.name}"`);
+    return response;
   }
 
   async loginByPhone(phoneNumber: string) {
@@ -100,7 +112,6 @@ export class AuthService {
 
   async verifyWidgetOtp(accessToken: string) {
     const authKey = this.configService.get<string>('MSG91_AUTH_KEY');
-    console.log('DEBUG: Using MSG91 Auth Key:', authKey ? `${authKey.substring(0, 4)}...` : 'NOT FOUND'); // Debugging line
     const url = 'https://control.msg91.com/api/v5/widget/verifyAccessToken';
 
     const response = await fetch(url, {
@@ -117,13 +128,11 @@ export class AuthService {
     const data = await response.json();
 
     if (data.type !== 'success') {
-      console.error('DEBUG: MSG91 Verification Failed. Response:', data);
+      console.error('DEBUG: MSG91 Widget Verification Failed:', data);
       throw new UnauthorizedException('Invalid or expired OTP session.');
     }
 
-    // Normalize phone number from MSG91 response
     const phoneNumber = this.normalizePhoneNumber(data.mobile);
-
     return this.findOrCreateUserByPhone(phoneNumber);
   }
 
@@ -131,7 +140,6 @@ export class AuthService {
     const authKey = this.configService.get<string>('MSG91_AUTH_KEY');
     const templateId = this.configService.get<string>('MSG91_TEMPLATE_ID');
 
-    // Ensure phone number has 91 prefix
     let mobile = phoneNumber;
     if (!mobile.startsWith('91')) {
       mobile = '91' + mobile;
@@ -146,7 +154,7 @@ export class AuthService {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          Param1: "value1", // Optional params for template
+          Param1: "value1",
           Param2: "value2"
         })
       });
@@ -155,7 +163,6 @@ export class AuthService {
       if (data.type === 'success') {
         return { message: 'OTP sent successfully', reqId: data.request_id };
       } else {
-        console.error('MSG91 Send OTP Error:', data);
         throw new Error(data.message || 'Failed to send OTP');
       }
     } catch (error) {
@@ -164,17 +171,14 @@ export class AuthService {
   }
 
   async verifyOtp(phoneNumber: string, otp: string) {
-    // 1. Test Credentials Bypass (Matches Rider App Logic)
-    // Check if phone ends with test number (handles 91 prefix) and OTP matches
+    // 1. Test Credentials Bypass
     if (phoneNumber.endsWith('1234567890') && otp === '123456') {
-      console.log('DEBUG: Test credentials used. Bypassing MSG91 verification.');
+      console.log('DEBUG: Test credentials (1234567890) matched. Bypassing MSG91.');
       const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
       return this.findOrCreateUserByPhone(normalizedPhone);
     }
 
     const authKey = this.configService.get<string>('MSG91_AUTH_KEY');
-
-    // Ensure phone number has 91 prefix
     let mobile = phoneNumber;
     if (!mobile.startsWith('91')) {
       mobile = '91' + mobile;
@@ -183,23 +187,18 @@ export class AuthService {
     const url = `https://control.msg91.com/api/v5/otp/verify?otp=${otp}&mobile=${mobile}&authkey=${authKey}`;
 
     try {
-      // Changed to GET to match working Rider App implementation
-      const response = await fetch(url, {
-        method: 'GET'
-      });
-
+      const response = await fetch(url, { method: 'GET' });
       const data = await response.json();
 
       if (data.type === 'success') {
-        // OTP Verified. Now Login/Register User.
         const normalizedPhone = this.normalizePhoneNumber(mobile);
         return this.findOrCreateUserByPhone(normalizedPhone);
       } else {
-        console.error('DEBUG: MSG91 Verify Error:', data);
+        console.error('DEBUG: MSG91 Verify Response failed:', data);
         throw new UnauthorizedException('Invalid OTP');
       }
     } catch (error) {
-      console.error('DEBUG: Verify OTP Exception:', error);
+      console.error('DEBUG: OTP Verify Exception:', error);
       throw new UnauthorizedException('Invalid OTP');
     }
   }
@@ -208,5 +207,4 @@ export class AuthService {
     const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
     return this.findOrCreateUserByPhone(normalizedPhone);
   }
-
 }
