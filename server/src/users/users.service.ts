@@ -13,6 +13,11 @@ export class UsersService {
         private riderProfileRepository: Repository<RiderProfile>,
     ) { }
 
+    // Added this method to find a user by their UUID
+    async findOneById(id: string): Promise<User | null> {
+        return this.usersRepository.findOne({ where: { id } });
+    }
+
     async update(id: string, name: string): Promise<User> {
         const user = await this.usersRepository.findOne({ where: { id } });
         if (!user) {
