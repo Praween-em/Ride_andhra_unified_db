@@ -25,7 +25,7 @@ const getApiUrl = () => {
   return 'http://192.168.29.18:8082';
 
   //Production fallback
-  return 'https://ride-andhra-baceknd-final.onrender.com'; // CHANGE THIS for production
+  return 'https://ride-andhra-unified-db.onrender.com'; // CHANGE THIS for production
 };
 
 const API_BASE_URL = getApiUrl();

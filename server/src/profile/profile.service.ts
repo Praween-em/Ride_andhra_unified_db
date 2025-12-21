@@ -187,6 +187,18 @@ export class ProfileService {
     return digitsOnly.slice(-10);
   }
 
+  /**
+   * Mapping object to bridge frontend file field names to database-approved document types.
+   * This ensures that even if frontend naming changes, we only send valid strings to PostgreSQL.
+   */
+  private static readonly FIELD_TO_DOCUMENT_TYPE: Record<string, DocumentType> = {
+    profilePhoto: DocumentType.PROFILE_IMAGE,
+    licenseFrontPhoto: DocumentType.LICENSE_FRONT,
+    licenseBackPhoto: DocumentType.LICENSE_BACK,
+    aadhaarPhoto: DocumentType.AADHAAR,
+    panPhoto: DocumentType.PAN,
+  };
+
   async registerDriver(
     registerDriverDto: RegisterDriverDto,
     files: {
@@ -254,80 +266,37 @@ export class ProfileService {
       driver = await this.driverRepository.save(driver);
     }
 
-    // Create document entries in driver_documents table
+    // Create document entries in driver_documents table using mapping layer
     const documentsToCreate: Partial<DriverDocument>[] = [];
 
-    // 1. Profile Photo
-    if (files.profilePhoto?.[0]) {
-      const file = files.profilePhoto[0];
-      documentsToCreate.push({
-        driverId: driver.user_id,
-        documentType: DocumentType.PROFILE_IMAGE,
-        documentImage: file.buffer,
-        fileName: file.originalname,
-        mimeType: file.mimetype,
-        fileSize: file.size,
-        status: DocumentStatus.PENDING,
-      });
-    }
+    // Iterate through provided files and map to database document types
+    for (const [fieldName, fileArray] of Object.entries(files)) {
+      if (fileArray && fileArray[0]) {
+        const file = fileArray[0];
+        const documentType = ProfileService.FIELD_TO_DOCUMENT_TYPE[fieldName];
 
-    // 2. License Front Photo
-    if (files.licenseFrontPhoto?.[0]) {
-      const file = files.licenseFrontPhoto[0];
-      documentsToCreate.push({
-        driverId: driver.user_id,
-        documentType: DocumentType.LICENSE,
-        documentImage: file.buffer,
-        fileName: file.originalname,
-        mimeType: file.mimetype,
-        fileSize: file.size,
-        documentNumber: licenseNumber,
-        status: DocumentStatus.PENDING,
-      });
-    }
+        if (!documentType) {
+          console.warn(`⚠️ Unrecognized file field name: ${fieldName}. Skipping.`);
+          continue;
+        }
 
-    // 3. License Back Photo
-    if (files.licenseBackPhoto?.[0]) {
-      const file = files.licenseBackPhoto[0];
-      documentsToCreate.push({
-        driverId: driver.user_id,
-        documentType: DocumentType.LICENSE_BACK,
-        documentImage: file.buffer,
-        fileName: file.originalname,
-        mimeType: file.mimetype,
-        fileSize: file.size,
-        documentNumber: licenseNumber,
-        status: DocumentStatus.PENDING,
-      });
-    }
+        const documentEntry: Partial<DriverDocument> = {
+          driverId: driver.user_id,
+          documentType: documentType,
+          documentImage: file.buffer,
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          fileSize: file.size,
+          status: DocumentStatus.PENDING,
+        };
 
-    // 4. Aadhar Photo
-    if (files.aadhaarPhoto?.[0]) {
-      const file = files.aadhaarPhoto[0];
-      documentsToCreate.push({
-        driverId: driver.user_id,
-        documentType: DocumentType.AADHAR,
-        documentImage: file.buffer,
-        fileName: file.originalname,
-        mimeType: file.mimetype,
-        fileSize: file.size,
-        documentNumber: '', // Can be added to DTO later
-        status: DocumentStatus.PENDING,
-      });
-    }
+        // Add document number for license-related entries
+        if (fieldName === 'licenseFrontPhoto' || fieldName === 'licenseBackPhoto') {
+          documentEntry.documentNumber = licenseNumber;
+        }
 
-    // 5. PAN Photo
-    if (files.panPhoto?.[0]) {
-      const file = files.panPhoto[0];
-      documentsToCreate.push({
-        driverId: driver.user_id,
-        documentType: DocumentType.PAN,
-        documentImage: file.buffer,
-        fileName: file.originalname,
-        mimeType: file.mimetype,
-        fileSize: file.size,
-        status: DocumentStatus.PENDING,
-      });
+        documentsToCreate.push(documentEntry);
+      }
     }
 
     if (documentsToCreate.length > 0) {
@@ -547,7 +516,7 @@ export class ProfileService {
    * Check if driver has all required documents approved
    */
   async hasAllDocumentsApproved(driverId: string): Promise<boolean> {
-    const requiredDocuments = [DocumentType.AADHAR, DocumentType.LICENSE];
+    const requiredDocuments = [DocumentType.AADHAAR, DocumentType.LICENSE_FRONT];
 
     const approvedDocuments = await this.driverDocumentRepository.count({
       where: {

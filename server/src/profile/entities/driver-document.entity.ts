@@ -11,9 +11,9 @@ import { Driver } from './driver.entity';
 import { User } from '../../auth/entities/user.entity';
 
 export enum DocumentType {
-    PROFILE_IMAGE = 'profile_image',
-    AADHAR = 'aadhar',
-    LICENSE = 'license',
+    PROFILE_IMAGE = 'profile_photo',
+    AADHAAR = 'aadhaar',
+    LICENSE_FRONT = 'license_front',
     LICENSE_BACK = 'license_back',
     PAN = 'pan',
     VEHICLE_RC = 'vehicle_rc',
