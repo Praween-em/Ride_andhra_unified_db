@@ -31,8 +31,12 @@ export class RidesService {
   ) { }
 
   async create(createRideDto: CreateRideDto, userId?: string): Promise<Ride> {
-    const distance = createRideDto.distance || 0;
-    const duration = createRideDto.duration || 0;
+    console.log('--- [Reference CreateRide] Start ---');
+    console.log('Incoming DTO:', JSON.stringify(createRideDto, null, 2));
+    console.log('Authenticated User ID:', userId);
+
+    const distanceRaw = createRideDto.distance || 0;
+    const durationRaw = createRideDto.duration || 0;
 
     const rideData: any = {
       ...createRideDto,
@@ -44,24 +48,33 @@ export class RidesService {
       dropoffLatitude: createRideDto.dropoffLatitude || createRideDto.dropoff_latitude,
       dropoffLongitude: createRideDto.dropoffLongitude || createRideDto.dropoff_longitude,
       vehicleType: createRideDto.vehicleType || createRideDto.vehicle_type,
-      distance: distance / 1000, // Store as KM
-      duration: duration / 60,   // Store as Minutes
+      distance: distanceRaw / 1000, // Store as KM
+      duration: Math.ceil(durationRaw / 60),   // Store as Minutes
       status: RideStatus.PENDING,
     };
 
-    const newRide = this.rideRepository.create(rideData as Partial<Ride>);
-    const savedRide = await this.rideRepository.save(newRide);
+    console.log('Mapped Ride Data for creation:', JSON.stringify(rideData, null, 2));
 
-    // Immediately notify the first available driver
-    setImmediate(async () => {
-      try {
-        await this.notifyNextDriver(savedRide.id);
-      } catch (error) {
-        console.error('Error in initial driver notification:', error);
-      }
-    });
+    try {
+      const newRide = this.rideRepository.create(rideData as Partial<Ride>);
+      const savedRide = await this.rideRepository.save(newRide);
+      console.log('--- [Reference CreateRide] Success ---', savedRide.id);
 
-    return savedRide;
+      // Immediately notify the first available driver
+      setImmediate(async () => {
+        try {
+          await this.notifyNextDriver(savedRide.id);
+        } catch (error) {
+          console.error('Error in initial driver notification:', error);
+        }
+      });
+
+      return savedRide;
+    } catch (error) {
+      console.error('--- [Reference CreateRide] ERROR ---');
+      console.error(error);
+      throw error;
+    }
   }
 
   async findAll(): Promise<Ride[]> {
