@@ -31,7 +31,9 @@ export class RidesService {
   ) { }
 
   async create(createRideDto: CreateRideDto, userId?: string): Promise<Ride> {
-    // Map fields for compatibility between Rider and Driver apps
+    const distance = createRideDto.distance || 0;
+    const duration = createRideDto.duration || 0;
+
     const rideData: any = {
       ...createRideDto,
       riderId: userId || createRideDto.riderId,
@@ -42,6 +44,8 @@ export class RidesService {
       dropoffLatitude: createRideDto.dropoffLatitude || createRideDto.dropoff_latitude,
       dropoffLongitude: createRideDto.dropoffLongitude || createRideDto.dropoff_longitude,
       vehicleType: createRideDto.vehicleType || createRideDto.vehicle_type,
+      distance: distance / 1000, // Store as KM
+      duration: duration / 60,   // Store as Minutes
       status: RideStatus.PENDING,
     };
 
@@ -96,11 +100,16 @@ export class RidesService {
   }
 
   async calculateFare(
-    distanceKm: number,
-    durationMin: number,
+    distanceMeters: number,
+    durationSeconds: number,
     vehicleTypeStr: string,
   ): Promise<number> {
-    console.log(`[CalculateFare] Start: ${vehicleTypeStr}, Dist: ${distanceKm}, Dur: ${durationMin}`);
+    const distanceKm = distanceMeters / 1000;
+    const durationMin = durationSeconds / 60;
+
+    console.log(`[CalculateFare] Start: ${vehicleTypeStr}, RawDist: ${distanceMeters}m, RawDur: ${durationSeconds}s`);
+    console.log(`[CalculateFare] Converted: Dist: ${distanceKm.toFixed(3)}km, Dur: ${durationMin.toFixed(2)}min`);
+
     try {
       // Normalize vehicle type
       const vehicleType = vehicleTypeStr.toLowerCase().replace('-', '_') as VehicleType;
