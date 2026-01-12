@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NotificationsGateway } from './notifications.gateway';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { User } from '../users/user.entity';
+import { User } from '../auth/entities/user.entity';
 import { Notification, NotificationType } from './entities/notification.entity';
 import Expo, { ExpoPushMessage } from 'expo-server-sdk';
 
