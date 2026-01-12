@@ -240,7 +240,7 @@ export class RidesService {
       .andWhere('driver.currentLongitude IS NOT NULL')
       .andWhere(
         `ST_DWithin(
-          driver.currentLocation::geography,
+          driver.current_location::geography,
           ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
           :radius
         )`,
@@ -318,7 +318,7 @@ export class RidesService {
     query = query
       .addSelect(
         `ST_Distance(
-          driver.currentLocation::geography,
+          driver.current_location::geography,
           ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
         )`,
         'distance',
