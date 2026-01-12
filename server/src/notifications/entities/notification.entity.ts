@@ -7,8 +7,8 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { User } from '../../auth/entities/user.entity';
-import { Ride } from '../../rides/entities/ride.entity';
+import { User } from '../../users/user.entity';
+// import { Ride } from '../../rides/entities/ride.entity';
 
 export enum NotificationType {
   RIDE_REQUEST = 'ride_request',
@@ -27,9 +27,9 @@ export class Notification {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  @ManyToOne(() => Ride)
-  @JoinColumn({ name: 'ride_id' })
-  ride: Ride;
+  // @ManyToOne(() => Ride)
+  // @JoinColumn({ name: 'ride_id' })
+  // ride: Ride;
 
   @Column({
     type: 'enum',
