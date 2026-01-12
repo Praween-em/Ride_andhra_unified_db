@@ -252,7 +252,7 @@ export class NotificationsService {
   private async saveNotification(user: User, ride: any, message: any, type: NotificationType) {
     const notification = this.notificationRepository.create({
       user,
-      ride,
+      rideId: ride.id,
       type,
       title: message.title,
       message: message.body,

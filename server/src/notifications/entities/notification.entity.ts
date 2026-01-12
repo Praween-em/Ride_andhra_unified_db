@@ -27,9 +27,8 @@ export class Notification {
   @JoinColumn({ name: 'user_id' })
   user: User;
 
-  // @ManyToOne(() => Ride)
-  // @JoinColumn({ name: 'ride_id' })
-  // ride: Ride;
+  @Column({ name: 'ride_id', nullable: true })
+  rideId: string;
 
   @Column({
     type: 'enum',
