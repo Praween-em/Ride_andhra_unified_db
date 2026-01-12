@@ -3,6 +3,7 @@ import { NotificationsGateway } from './notifications.gateway';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
+import { Notification, NotificationType } from './entities/notification.entity';
 import Expo, { ExpoPushMessage } from 'expo-server-sdk';
 
 @Injectable()
@@ -14,6 +15,8 @@ export class NotificationsService {
     private readonly notificationsGateway: NotificationsGateway,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Notification)
+    private readonly notificationRepository: Repository<Notification>,
   ) { }
 
   /**
@@ -107,6 +110,155 @@ export class NotificationsService {
     } catch (error) {
       this.logger.error(`[Push] Failed to send notification: ${error}`);
     }
+  }
+
+  async getUserNotifications(userId: string) {
+    return this.notificationRepository.find({
+      where: { user: { id: userId } },
+      order: { createdAt: 'DESC' },
+    });
+  }
+
+  /**
+   * Send ride notification to a specific driver
+   */
+  async sendRideNotificationToDriver(driver: any, ride: any): Promise<void> {
+    if (!driver.user?.pushToken) {
+      this.logger.warn(`Driver ${driver.user_id} does not have a push token`);
+      return;
+    }
+
+    if (!Expo.isExpoPushToken(driver.user.pushToken)) {
+      this.logger.warn(`Invalid push token for driver ${driver.user_id}`);
+      return;
+    }
+
+    const message: ExpoPushMessage = {
+      to: driver.user.pushToken,
+      sound: 'default' as const,
+      title: 'New Ride Request! 🚗',
+      body: `Pickup: ${ride.pickupLocation} • Fare: ₹${ride.fare}`,
+      data: {
+        type: 'ride_request',
+        rideId: ride.id,
+        pickupLocation: ride.pickupLocation,
+        pickupLatitude: ride.pickupLatitude,
+        pickupLongitude: ride.pickupLongitude,
+        dropoffLocation: ride.dropoffLocation,
+        dropoffLatitude: ride.dropoffLatitude,
+        dropoffLongitude: ride.dropoffLongitude,
+        fare: ride.fare,
+        distance: ride.distance,
+        duration: ride.duration,
+      },
+      priority: 'high' as const,
+    };
+
+    try {
+      const tickets = await this.expo.sendPushNotificationsAsync([message]);
+      this.logger.log(`Sent ride notification to driver ${driver.user_id}: ${JSON.stringify(tickets)}`);
+
+      // WebSocket broadcast for the ride
+      this.notificationsGateway.sendRideUpdate(ride.id, 'ride_request', message.data);
+
+      await this.saveNotification(driver.user, ride, message, NotificationType.RIDE_REQUEST);
+    } catch (error) {
+      this.logger.error(`Error sending notification to driver ${driver.user_id}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Notify user that their ride has been accepted by a driver
+   */
+  async notifyUserRideAccepted(userId: string, ride: any, driver: any): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    if (!user?.pushToken || !Expo.isExpoPushToken(user.pushToken)) {
+      this.logger.warn(`User ${userId} missing/invalid push token for acceptance notification.`);
+      return;
+    }
+
+    const driverName = `${driver.firstName || ''} ${driver.lastName || ''}`.trim() || 'Your driver';
+
+    const message: ExpoPushMessage = {
+      to: user.pushToken,
+      sound: 'default' as const,
+      title: 'Driver Found! 🎉',
+      body: `${driverName} is on the way. ${driver.vehicleModel || 'Vehicle'} - ${driver.vehiclePlateNumber || ''}`,
+      data: {
+        type: 'ride_accepted',
+        rideId: ride.id,
+        driverId: driver.user_id,
+        driverName: driverName,
+        vehicleModel: driver.vehicleModel,
+        vehicleColor: driver.vehicleColor,
+        vehiclePlateNumber: driver.vehiclePlateNumber,
+        driverRating: driver.driverRating,
+      },
+      priority: 'high' as const,
+    };
+
+    try {
+      await this.expo.sendPushNotificationsAsync([message]);
+      this.notificationsGateway.sendRideUpdate(ride.id, 'ride_accepted', message.data);
+      await this.saveNotification(user, ride, message, NotificationType.RIDE_UPDATE);
+    } catch (error) {
+      this.logger.error(`Error sending accepted notification to user ${userId}: ${error.message}`);
+    }
+  }
+
+  async notifyUserRideStarted(userId: string, ride: any) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user?.pushToken || !Expo.isExpoPushToken(user.pushToken)) return;
+
+    const message: ExpoPushMessage = {
+      to: user.pushToken,
+      sound: 'default' as const,
+      title: 'Ride Started! 🚕',
+      body: 'Your ride has started. Have a safe journey!',
+      data: { type: 'ride_started', rideId: ride.id },
+    };
+
+    try {
+      await this.expo.sendPushNotificationsAsync([message]);
+      this.notificationsGateway.sendRideUpdate(ride.id, 'ride_started', message.data);
+      await this.saveNotification(user, ride, message, NotificationType.RIDE_UPDATE);
+    } catch (error) {
+      this.logger.error(`Error sending ride started notification: ${error.message}`);
+    }
+  }
+
+  async notifyUserRideCompleted(userId: string, ride: any) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user?.pushToken || !Expo.isExpoPushToken(user.pushToken)) return;
+
+    const message: ExpoPushMessage = {
+      to: user.pushToken,
+      sound: 'default' as const,
+      title: 'Ride Completed! ✅',
+      body: `You have arrived at your destination. Total fare: ₹${ride.finalFare || ride.fare}`,
+      data: { type: 'ride_completed', rideId: ride.id, fare: ride.finalFare },
+    };
+
+    try {
+      await this.expo.sendPushNotificationsAsync([message]);
+      this.notificationsGateway.sendRideUpdate(ride.id, 'ride_completed', message.data);
+      await this.saveNotification(user, ride, message, NotificationType.RIDE_UPDATE);
+    } catch (error) {
+      this.logger.error(`Error sending ride completed notification: ${error.message}`);
+    }
+  }
+
+  private async saveNotification(user: User, ride: any, message: any, type: NotificationType) {
+    const notification = this.notificationRepository.create({
+      user,
+      ride,
+      type,
+      title: message.title,
+      message: message.body,
+      data: message.data,
+    });
+    await this.notificationRepository.save(notification);
   }
 
   private async removeInvalidToken(userId: string) {
