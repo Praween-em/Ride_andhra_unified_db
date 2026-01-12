@@ -68,4 +68,12 @@ export class UsersService {
 
     return Number(riderProfile.rider_rating);
   }
+
+  async updatePushToken(id: string, token: string): Promise<void> {
+    const user = await this.usersRepository.findOne({ where: { id } });
+    if (user) {
+      user.pushToken = token;
+      await this.usersRepository.save(user);
+    }
+  }
 }

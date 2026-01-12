@@ -53,4 +53,7 @@ export class User {
 
   @Column({ type: 'varchar', length: 255, nullable: true })
   profile_image: string;
+
+  @Column({ type: 'text', nullable: true })
+  pushToken: string;
 }

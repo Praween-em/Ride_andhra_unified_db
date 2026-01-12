@@ -27,4 +27,10 @@ export class UsersController {
     const rating = await this.usersService.getUserRating(userId);
     return { rating };
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/push-token')
+  async updatePushToken(@Param('id') id: string, @Body('pushToken') pushToken: string) {
+    return this.usersService.updatePushToken(id, pushToken);
+  }
 }
