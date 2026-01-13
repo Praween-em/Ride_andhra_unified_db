@@ -17,17 +17,17 @@ const multerOptions = {
   storage: multer.memoryStorage(),
 };
 
-@UseGuards(JwtAuthGuard) // Added
 @Controller('profile')
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) { }
 
-  @Get()
+  @UseGuards(JwtAuthGuard)
   @Get()
   getProfile(@Req() req) {
     return this.profileService.getProfile(req.user.userId);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Patch()
   updateProfile(@Body() updateProfileDto: UpdateProfileDto) {
     return this.profileService.updateProfile(updateProfileDto);
@@ -63,18 +63,21 @@ export class ProfileController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
   @Put('driver/status')
   async updateDriverStatus(@Body() updateDriverStatusDto: UpdateDriverStatusDto, @Req() req: any) {
     const userId = req.user.userId;
     return this.profileService.updateDriverStatus(userId, updateDriverStatusDto);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Put('push-token')
   async updatePushToken(@Body() body: { token: string }, @Req() req: any) {
     const userId = req.user.userId;
     return this.profileService.updatePushToken(userId, body.token);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('earnings')
   async getEarnings(@Req() req: any) {
     const userId = req.user.userId;
@@ -87,6 +90,7 @@ export class ProfileController {
    * Upload a single driver document
    * POST /profile/documents/:driverId
    */
+  @UseGuards(JwtAuthGuard)
   @Post('documents/:driverId')
   @UseInterceptors(FileInterceptor('document', multerOptions))
   async uploadDocument(
@@ -101,6 +105,7 @@ export class ProfileController {
    * Get document image
    * GET /profile/documents/image/:documentId
    */
+  @UseGuards(JwtAuthGuard)
   @Get('documents/image/:documentId')
   async getDocumentImage(
     @Param('documentId') documentId: string,
@@ -125,6 +130,7 @@ export class ProfileController {
    * Get all documents for a driver
    * GET /profile/documents/:driverId
    */
+  @UseGuards(JwtAuthGuard)
   @Get('documents/:driverId')
   async getDriverDocuments(@Param('driverId') driverId: string) {
     return this.profileService.getDriverDocuments(driverId);
@@ -134,6 +140,7 @@ export class ProfileController {
    * Get a specific document by type
    * GET /profile/documents/:driverId/:documentType
    */
+  @UseGuards(JwtAuthGuard)
   @Get('documents/:driverId/:documentType')
   async getDocument(
     @Param('driverId') driverId: string,
@@ -146,6 +153,7 @@ export class ProfileController {
    * Verify or reject a document (Admin only)
    * PATCH /profile/documents/:documentId/verify
    */
+  @UseGuards(JwtAuthGuard)
   @Patch('documents/:documentId/verify')
   async verifyDocument(
     @Param('documentId') documentId: string,
@@ -160,6 +168,7 @@ export class ProfileController {
    * Get documents by status (Admin endpoint)
    * GET /profile/admin/documents?status=pending
    */
+  @UseGuards(JwtAuthGuard)
   @Get('admin/documents')
   async getDocumentsByStatus(@Query('status') status: DocumentStatus) {
     if (status) {
@@ -172,6 +181,7 @@ export class ProfileController {
    * Get pending documents for review (Admin endpoint)
    * GET /profile/admin/documents/pending
    */
+  @UseGuards(JwtAuthGuard)
   @Get('admin/documents/pending')
   async getPendingDocuments() {
     return this.profileService.getPendingDocuments();
