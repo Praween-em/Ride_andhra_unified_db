@@ -240,7 +240,7 @@ export class RidesService {
       .andWhere('driver.currentLongitude IS NOT NULL')
       .andWhere(
         `ST_DWithin(
-          driver.currentLocation::geography,
+          driver.current_location::geography,
           ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography,
           :radius
         )`,
@@ -282,7 +282,7 @@ export class RidesService {
       }
 
       if (targetDriverVehicleTypes.length > 0) {
-        query = query.andWhere('LOWER(driver.vehicleType) IN (:...vehicleTypes)', { vehicleTypes: targetDriverVehicleTypes });
+        query = query.andWhere('driver.vehicleType IN (:...vehicleTypes)', { vehicleTypes: targetDriverVehicleTypes });
       }
     }
 
@@ -318,7 +318,7 @@ export class RidesService {
     query = query
       .addSelect(
         `ST_Distance(
-          driver.currentLocation::geography,
+          driver.current_location::geography,
           ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography
         )`,
         'distance',
