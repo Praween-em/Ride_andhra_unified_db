@@ -7,7 +7,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
-import { User } from '../../users/user.entity';
+import { User } from '../../auth/entities/user.entity';
 // import { Ride } from '../../rides/entities/ride.entity';
 
 export enum NotificationType {

@@ -19,15 +19,16 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ unique: true, name: 'phone_number' })
+  @Column({ unique: true, name: 'phone_number', type: 'varchar', length: 15 })
   phone_number: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, type: 'varchar', length: 100 })
   name: string;
 
   @Column({
     type: 'enum',
     enum: UserRole,
+    enumName: 'users_role_enum',
     array: true,
     default: [UserRole.RIDER],
   })
@@ -45,12 +46,12 @@ export class User {
   @Column({ type: 'varchar', length: 4, nullable: true, name: 'rider_pin' })
   ridePin: string;
 
-  @Column({ type: 'varchar', nullable: true, name: 'profile_image' })
+  @Column({ type: 'varchar', length: 255, nullable: true, name: 'profile_image' })
   profile_image: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updated_at' })
   updated_at: Date;
 }
