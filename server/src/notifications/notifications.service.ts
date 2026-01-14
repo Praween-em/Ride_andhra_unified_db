@@ -194,6 +194,7 @@ export class NotificationsService {
         vehicleColor: driver.vehicleColor,
         vehiclePlateNumber: driver.vehiclePlateNumber,
         driverRating: driver.driverRating,
+        driverPhone: driver.user?.phone_number || '',
       },
       priority: 'high' as const,
     };
