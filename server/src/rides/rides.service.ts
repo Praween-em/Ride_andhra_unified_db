@@ -100,8 +100,13 @@ export class RidesService {
 
     ride.status = RideStatus.CANCELLED;
     ride.cancelledAt = new Date();
-    // Logic for cancellation reason/fee could be added here
-    return this.rideRepository.save(ride);
+
+    const savedRide = await this.rideRepository.save(ride);
+
+    // Notify user about cancellation
+    await this.notificationsService.notifyUserRideCancelled(ride.user.id, savedRide);
+
+    return savedRide;
   }
 
   async getMyRides(userId: string): Promise<Ride[]> {

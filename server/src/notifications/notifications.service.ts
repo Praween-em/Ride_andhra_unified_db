@@ -250,6 +250,47 @@ export class NotificationsService {
     }
   }
 
+  async notifyUserRideCancelled(userId: string, ride: any) {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+
+    // Always emit socket event even if push token is missing/invalid
+    const socketData = {
+      type: 'ride_cancelled',
+      rideId: ride.id,
+      status: 'CANCELLED',
+      ride: ride
+    };
+
+    try {
+      this.notificationsGateway.sendRideUpdate(ride.id, 'ride_cancelled', socketData);
+      this.logger.log(`[Socket] Emitted ride_cancelled for ride ${ride.id}`);
+    } catch (wsError) {
+      this.logger.error(`[Socket] Failed to emit ride_cancelled: ${wsError.message}`);
+    }
+
+    if (!user?.pushToken || !Expo.isExpoPushToken(user.pushToken)) {
+      this.logger.warn(`User ${userId} has no valid push token for cancellation alert.`);
+      return;
+    }
+
+    const message: ExpoPushMessage = {
+      to: user.pushToken,
+      sound: 'default' as const,
+      title: 'Ride Cancelled ❌',
+      body: 'Your ride has been cancelled.',
+      data: socketData,
+      priority: 'high' as const,
+    };
+
+    try {
+      await this.expo.sendPushNotificationsAsync([message]);
+      await this.saveNotification(user, ride, message, NotificationType.RIDE_UPDATE);
+      this.logger.log(`[Push] Sent ride cancelled notification to user ${userId}`);
+    } catch (error) {
+      this.logger.error(`Error sending ride cancelled notification: ${error.message}`);
+    }
+  }
+
   private async saveNotification(user: User, ride: any, message: any, type: NotificationType) {
     const notification = this.notificationRepository.create({
       user,
